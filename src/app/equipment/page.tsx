@@ -2,10 +2,14 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import type { EquipmentDTO } from "@/lib/types";
 import StatusBadge from "@/components/StatusBadge";
+import { canManageEquipment } from "@/lib/permissions";
 
 export default function EquipmentPage() {
+  const { data: session } = useSession();
+  const canManage = canManageEquipment(session?.user.role);
   const [equipment, setEquipment] = useState<EquipmentDTO[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -62,15 +66,17 @@ export default function EquipmentPage() {
             Regista equipamentos pelo Nome/Hostname (ID Único) e gera o respetivo QR Code.
           </p>
         </div>
-        <button
-          onClick={() => setFormOpen((v) => !v)}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-        >
-          {formOpen ? "Cancelar" : "+ Registar Equipamento"}
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setFormOpen((v) => !v)}
+            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+          >
+            {formOpen ? "Cancelar" : "+ Registar Equipamento"}
+          </button>
+        )}
       </div>
 
-      {formOpen && (
+      {canManage && formOpen && (
         <form onSubmit={handleSubmit} className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="mb-1 block text-xs font-medium text-gray-600">Nome / Hostname (ID Único) *</label>
@@ -160,9 +166,11 @@ export default function EquipmentPage() {
                       <Link href={`/equipment/${encodeURIComponent(eq.hostname)}/print`} className="text-brand-600 hover:underline">
                         Imprimir QR
                       </Link>
-                      <button onClick={() => handleDelete(eq.hostname)} className="text-red-600 hover:underline">
-                        Eliminar
-                      </button>
+                      {canManage && (
+                        <button onClick={() => handleDelete(eq.hostname)} className="text-red-600 hover:underline">
+                          Eliminar
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { canManageCheckpoints } from "@/lib/permissions";
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   const checkpoints = await prisma.checkpoint.findMany({
     orderBy: { order: "asc" },
   });
@@ -9,6 +16,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || !canManageCheckpoints(session.user.role)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+  }
+
   const body = await req.json();
   const { name, order, description } = body ?? {};
 

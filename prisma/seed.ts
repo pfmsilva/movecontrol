@@ -1,6 +1,11 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+async function hash(plain: string) {
+  return bcrypt.hash(plain, 10);
+}
 
 async function main() {
   // Checkpoints por omissão do processo de migração
@@ -11,25 +16,68 @@ async function main() {
     { name: "Instalado no Rack Destino", order: 4, description: "Equipamento montado, cablado e ligado no rack final." },
   ];
 
+  const checkpoints: Record<number, { id: string }> = {};
   for (const cp of checkpointsData) {
-    await prisma.checkpoint.upsert({
+    const created = await prisma.checkpoint.upsert({
       where: { order: cp.order },
       update: { name: cp.name, description: cp.description },
       create: cp,
     });
+    checkpoints[cp.order] = created;
   }
 
-  // Utilizadores de exemplo
+  // Utilizadores de exemplo — um por cada role.
+  // ⚠️ Muda estas passwords antes de ires para produção.
   const usersData = [
-    { name: "Paulo Silva", email: "paulo.martins.silva@gmail.com" },
-    { name: "Equipa Datacenter", email: null },
+    {
+      name: "Administrador",
+      email: "admin@movecontrol.local",
+      password: "Admin123!",
+      role: "ADMIN" as const,
+      validatorCheckpointOrders: [] as number[],
+    },
+    {
+      name: "Controlador Geral",
+      email: "controlador@movecontrol.local",
+      password: "Controlador123!",
+      role: "CONTROLLER" as const,
+      validatorCheckpointOrders: [],
+    },
+    {
+      name: "Validador Origem",
+      email: "validador.origem@movecontrol.local",
+      password: "Validador123!",
+      role: "VALIDATOR" as const,
+      validatorCheckpointOrders: [1, 2],
+    },
+    {
+      name: "Validador Destino",
+      email: "validador.destino@movecontrol.local",
+      password: "Validador123!",
+      role: "VALIDATOR" as const,
+      validatorCheckpointOrders: [3, 4],
+    },
   ];
 
   for (const u of usersData) {
     await prisma.user.upsert({
-      where: { name: u.name },
-      update: {},
-      create: u,
+      where: { email: u.email },
+      update: {
+        name: u.name,
+        role: u.role,
+        validatorCheckpoints: {
+          set: u.validatorCheckpointOrders.map((o) => ({ id: checkpoints[o].id })),
+        },
+      },
+      create: {
+        name: u.name,
+        email: u.email,
+        passwordHash: await hash(u.password),
+        role: u.role,
+        validatorCheckpoints: {
+          connect: u.validatorCheckpointOrders.map((o) => ({ id: checkpoints[o].id })),
+        },
+      },
     });
   }
 
@@ -48,7 +96,11 @@ async function main() {
     });
   }
 
-  console.log("Seed concluído: checkpoints, utilizadores e equipamentos de exemplo criados.");
+  console.log("Seed concluído: checkpoints, utilizadores (com roles) e equipamentos de exemplo criados.");
+  console.log("Credenciais de exemplo:");
+  for (const u of usersData) {
+    console.log(`  - ${u.role.padEnd(10)} ${u.email} / ${u.password}`);
+  }
 }
 
 main()

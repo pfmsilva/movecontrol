@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deriveStatus } from "@/lib/utils";
+import { auth } from "@/auth";
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   const [equipment, checkpoints] = await Promise.all([
     prisma.equipment.findMany({
       include: {

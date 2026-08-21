@@ -1,3 +1,7 @@
+import type { Role } from "@prisma/client";
+
+export type { Role };
+
 export type EquipmentStatus = "pending" | "in_transit" | "completed";
 
 export interface CheckpointDTO {
@@ -11,8 +15,17 @@ export interface CheckpointDTO {
 export interface UserDTO {
   id: string;
   name: string;
-  email: string | null;
+  email: string;
+  role: Role;
   createdAt: string;
+  validatorCheckpoints: CheckpointDTO[];
+}
+
+/** Versão reduzida do utilizador, usada quando embutido num ScanEvent. */
+export interface ScanUserDTO {
+  id: string;
+  name: string;
+  role: Role;
 }
 
 export interface ScanEventDTO {
@@ -23,7 +36,7 @@ export interface ScanEventDTO {
   notes: string | null;
   timestamp: string;
   checkpoint: CheckpointDTO;
-  user: UserDTO;
+  user: ScanUserDTO;
 }
 
 export interface EquipmentDTO {

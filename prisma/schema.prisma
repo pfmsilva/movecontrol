@@ -37,15 +37,33 @@ model Checkpoint {
   description String?
   createdAt   DateTime    @default(now())
   scans       ScanEvent[]
+
+  /// Utilizadores (VALIDATOR) autorizados a assumir este checkpoint.
+  validators  User[]      @relation("ValidatorCheckpoints")
 }
 
-/// Utilizador responsável por efetuar os scans.
+/// Papel de acesso do utilizador na aplicação.
+/// - ADMIN: controlo total (utilizadores, checkpoints, equipamentos, scans).
+/// - CONTROLLER: vê tudo exceto utilizadores; cria/apaga equipamentos e checkpoints; faz scans.
+/// - VALIDATOR: só pode efetuar scans nos checkpoints que lhe estão associados.
+enum Role {
+  ADMIN
+  CONTROLLER
+  VALIDATOR
+}
+
+/// Utilizador autenticado, responsável por efetuar os scans.
 model User {
-  id        String      @id @default(cuid())
-  name      String      @unique
-  email     String?
-  createdAt DateTime    @default(now())
-  scans     ScanEvent[]
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  role         Role         @default(VALIDATOR)
+  createdAt    DateTime     @default(now())
+  scans        ScanEvent[]
+
+  /// Checkpoints que este utilizador pode assumir quando faz scans (relevante para VALIDATOR).
+  validatorCheckpoints Checkpoint[] @relation("ValidatorCheckpoints")
 }
 
 /// Registo de leitura de QR Code: máquina + checkpoint + utilizador + timestamp.

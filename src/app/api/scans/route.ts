@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { isRestrictedValidator } from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const limit = Math.min(Number(searchParams.get("limit") ?? 50), 200);
   const checkpointId = searchParams.get("checkpointId") ?? undefined;
@@ -30,17 +37,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   const body = await req.json();
-  const { hostname, checkpointId, userId, notes } = body ?? {};
+  const { hostname, checkpointId, notes } = body ?? {};
+  // O utilizador responsável é sempre o da sessão autenticada — nunca confiar
+  // num userId vindo do cliente.
+  const userId = session.user.id;
 
   if (!hostname || typeof hostname !== "string") {
     return NextResponse.json({ error: "ID do equipamento (hostname) em falta no QR Code." }, { status: 400 });
   }
   if (!checkpointId) {
     return NextResponse.json({ error: "Seleciona o ponto de controlo (checkpoint) atual." }, { status: 400 });
-  }
-  if (!userId) {
-    return NextResponse.json({ error: "Seleciona o utilizador responsável pelo scan." }, { status: 400 });
   }
 
   const equipment = await prisma.equipment.findUnique({ where: { hostname: hostname.trim() } });
@@ -51,22 +63,32 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const [checkpoint, user] = await Promise.all([
-    prisma.checkpoint.findUnique({ where: { id: checkpointId } }),
-    prisma.user.findUnique({ where: { id: userId } }),
-  ]);
+  const checkpoint = await prisma.checkpoint.findUnique({ where: { id: checkpointId } });
   if (!checkpoint) {
     return NextResponse.json({ error: "Checkpoint inválido." }, { status: 400 });
   }
-  if (!user) {
-    return NextResponse.json({ error: "Utilizador inválido." }, { status: 400 });
+
+  // VALIDATOR só pode assumir os checkpoints que lhe estão associados.
+  // Verificação sempre feita à BD (nunca só ao JWT) para refletir alterações
+  // feitas por um ADMIN depois do login.
+  if (isRestrictedValidator(session.user.role)) {
+    const allowed = await prisma.user.findFirst({
+      where: { id: userId, validatorCheckpoints: { some: { id: checkpointId } } },
+      select: { id: true },
+    });
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Não tens permissão para efetuar scans neste checkpoint." },
+        { status: 403 }
+      );
+    }
   }
 
   const scan = await prisma.scanEvent.create({
     data: {
       equipmentId: equipment.id,
       checkpointId: checkpoint.id,
-      userId: user.id,
+      userId,
       notes: notes?.trim() || null,
     },
     include: { checkpoint: true, user: true, equipment: true },

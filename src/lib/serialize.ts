@@ -1,6 +1,6 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { deriveStatus } from "@/lib/utils";
-import type { EquipmentDTO, ScanEventDTO, CheckpointDTO, UserDTO } from "@/lib/types";
+import type { EquipmentDTO, ScanEventDTO, CheckpointDTO, ScanUserDTO, UserDTO } from "@/lib/types";
 
 export type EquipmentWithScans = Prisma.EquipmentGetPayload<{
   include: { scans: { include: { checkpoint: true; user: true } } };
@@ -22,8 +22,22 @@ function toCheckpointDTO(cp: {
   };
 }
 
-function toUserDTO(u: { id: string; name: string; email: string | null; createdAt: Date }): UserDTO {
-  return { id: u.id, name: u.name, email: u.email, createdAt: u.createdAt.toISOString() };
+function toScanUserDTO(u: { id: string; name: string; role: Role }): ScanUserDTO {
+  return { id: u.id, name: u.name, role: u.role };
+}
+
+export type UserWithCheckpoints = Prisma.UserGetPayload<{ include: { validatorCheckpoints: true } }>;
+
+/** Converte um User (sem nunca expor o passwordHash) num UserDTO. */
+export function toUserDTO(u: UserWithCheckpoints): UserDTO {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    createdAt: u.createdAt.toISOString(),
+    validatorCheckpoints: u.validatorCheckpoints.map(toCheckpointDTO),
+  };
 }
 
 function toScanDTO(
@@ -37,7 +51,7 @@ function toScanDTO(
     notes: s.notes,
     timestamp: s.timestamp.toISOString(),
     checkpoint: toCheckpointDTO(s.checkpoint),
-    user: toUserDTO(s.user),
+    user: toScanUserDTO(s.user),
   };
 }
 

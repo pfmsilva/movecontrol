@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+import { canManageCheckpoints } from "@/lib/permissions";
 
 interface Params {
   params: Promise<{ id: string }>;
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const session = await auth();
+  if (!session?.user || !canManageCheckpoints(session.user.role)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+  }
+
   const { id } = await params;
   const body = await req.json();
   const { name, order, description } = body ?? {};
@@ -26,6 +33,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  if (!session?.user || !canManageCheckpoints(session.user.role)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+  }
+
   const { id } = await params;
   try {
     const scanCount = await prisma.scanEvent.count({ where: { checkpointId: id } });

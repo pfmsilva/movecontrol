@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toEquipmentDTO } from "@/lib/serialize";
+import { auth } from "@/auth";
+import { canManageEquipment } from "@/lib/permissions";
 
 export async function GET() {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   const [equipment, maxOrderCp] = await Promise.all([
     prisma.equipment.findMany({
       include: { scans: { include: { checkpoint: true, user: true } } },
@@ -17,6 +24,11 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user || !canManageEquipment(session.user.role)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+  }
+
   const body = await req.json();
   const { hostname, model, serialNumber, notes } = body ?? {};
 

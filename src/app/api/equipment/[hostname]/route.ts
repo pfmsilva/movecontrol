@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toEquipmentDTO } from "@/lib/serialize";
+import { auth } from "@/auth";
+import { canManageEquipment } from "@/lib/permissions";
 
 interface Params {
   params: Promise<{ hostname: string }>;
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
+  }
+
   const { hostname } = await params;
   const decoded = decodeURIComponent(hostname);
 
@@ -28,6 +35,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Params) {
+  const session = await auth();
+  if (!session?.user || !canManageEquipment(session.user.role)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+  }
+
   const { hostname } = await params;
   const decoded = decodeURIComponent(hostname);
   const body = await req.json();
@@ -50,6 +62,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  if (!session?.user || !canManageEquipment(session.user.role)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+  }
+
   const { hostname } = await params;
   const decoded = decodeURIComponent(hostname);
   try {

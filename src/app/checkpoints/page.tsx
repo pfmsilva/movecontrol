@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useSession } from "next-auth/react";
 import type { CheckpointDTO } from "@/lib/types";
+import { canManageCheckpoints } from "@/lib/permissions";
 
 export default function CheckpointsPage() {
+  const { data: session } = useSession();
+  const canManage = canManageCheckpoints(session?.user.role);
   const [checkpoints, setCheckpoints] = useState<CheckpointDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +65,7 @@ export default function CheckpointsPage() {
         </p>
       </div>
 
+      {canManage && (
       <form onSubmit={handleSubmit} className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-4">
         <div className="sm:col-span-2">
           <label className="mb-1 block text-xs font-medium text-gray-600">Nome *</label>
@@ -101,6 +106,7 @@ export default function CheckpointsPage() {
           </button>
         </div>
       </form>
+      )}
 
       {loading ? (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-400">A carregar…</div>
@@ -120,9 +126,11 @@ export default function CheckpointsPage() {
                   {cp.description && <p className="text-xs text-gray-500">{cp.description}</p>}
                 </div>
               </div>
-              <button onClick={() => handleDelete(cp.id)} className="text-xs font-medium text-red-600 hover:underline">
-                Eliminar
-              </button>
+              {canManage && (
+                <button onClick={() => handleDelete(cp.id)} className="text-xs font-medium text-red-600 hover:underline">
+                  Eliminar
+                </button>
+              )}
             </li>
           ))}
         </ol>
