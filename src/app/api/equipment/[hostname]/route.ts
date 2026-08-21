@@ -1,11 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { toEquipmentDTO } from "@/lib/serialize";
+import { toEquipmentDTO, EQUIPMENT_INCLUDE } from "@/lib/serialize";
 import { auth } from "@/auth";
 import { canManageEquipment } from "@/lib/permissions";
+import type { PortType } from "@prisma/client";
 
 interface Params {
   params: Promise<{ hostname: string }>;
+}
+
+const FORM_FIELDS = [
+  "model",
+  "serialNumber",
+  "notes",
+  "wave",
+  "equipmentType",
+  "manufacturer",
+  "assetTag",
+  "kvm",
+  "powerCables",
+  "specialCables",
+  "arms",
+  "powerLocation",
+  "cableConnection",
+  "rails",
+  "originDatacenter",
+  "originEp",
+  "originIsland",
+  "originRack",
+  "originPosition",
+  "destinationDatacenter",
+  "destinationIpTelecom",
+  "destinationIsland",
+  "destinationRack",
+  "destinationPosition",
+] as const;
+
+const VALID_PORT_TYPES: PortType[] = ["RJ45", "FIBRA", "OUTRAS"];
+
+interface PortInput {
+  portType?: PortType | null;
+  etiquetaOrigem?: string | null;
+  portaEtiquetaDestino?: string | null;
+  patchPanelOrigem?: string | null;
+  patchPanelDestino?: string | null;
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
@@ -22,6 +60,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       where: { hostname: decoded },
       include: {
         scans: { include: { checkpoint: true, user: true }, orderBy: { timestamp: "desc" } },
+        ports: true,
       },
     }),
     prisma.checkpoint.findFirst({ orderBy: { order: "desc" } }),
@@ -43,17 +82,46 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { hostname } = await params;
   const decoded = decodeURIComponent(hostname);
   const body = await req.json();
-  const { model, serialNumber, notes } = body ?? {};
+
+  const data: Record<string, string | null> = {};
+  for (const field of FORM_FIELDS) {
+    if (body[field] !== undefined) {
+      const value = body[field];
+      data[field] = typeof value === "string" ? value.trim() || null : null;
+    }
+  }
+
+  const ports: PortInput[] | undefined = Array.isArray(body.ports) ? body.ports : undefined;
+  if (ports) {
+    for (const p of ports) {
+      if (p.portType != null && !VALID_PORT_TYPES.includes(p.portType)) {
+        return NextResponse.json({ error: "Tipo de porta inválido." }, { status: 400 });
+      }
+    }
+  }
 
   try {
     const equipment = await prisma.equipment.update({
       where: { hostname: decoded },
       data: {
-        ...(model !== undefined ? { model: model?.trim() || null } : {}),
-        ...(serialNumber !== undefined ? { serialNumber: serialNumber?.trim() || null } : {}),
-        ...(notes !== undefined ? { notes: notes?.trim() || null } : {}),
+        ...data,
+        ...(ports
+          ? {
+              ports: {
+                deleteMany: {},
+                create: ports.map((p, i) => ({
+                  order: i + 1,
+                  portType: p.portType || null,
+                  etiquetaOrigem: p.etiquetaOrigem?.trim() || null,
+                  portaEtiquetaDestino: p.portaEtiquetaDestino?.trim() || null,
+                  patchPanelOrigem: p.patchPanelOrigem?.trim() || null,
+                  patchPanelDestino: p.patchPanelDestino?.trim() || null,
+                })),
+              },
+            }
+          : {}),
       },
-      include: { scans: { include: { checkpoint: true, user: true } } },
+      include: EQUIPMENT_INCLUDE,
     });
     return NextResponse.json(toEquipmentDTO(equipment, null));
   } catch {

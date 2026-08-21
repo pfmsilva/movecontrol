@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { toEquipmentDTO } from "@/lib/serialize";
+import { toEquipmentDTO, EQUIPMENT_INCLUDE } from "@/lib/serialize";
 import { buildEquipmentExport } from "@/lib/excel";
 
 export async function GET() {
@@ -12,7 +12,7 @@ export async function GET() {
 
   const [equipment, maxOrderCp] = await Promise.all([
     prisma.equipment.findMany({
-      include: { scans: { include: { checkpoint: true, user: true } } },
+      include: EQUIPMENT_INCLUDE,
       orderBy: { hostname: "asc" },
     }),
     prisma.checkpoint.findFirst({ orderBy: { order: "desc" } }),

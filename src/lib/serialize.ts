@@ -1,10 +1,35 @@
 import type { Prisma, Role } from "@prisma/client";
 import { deriveStatus } from "@/lib/utils";
-import type { EquipmentDTO, ScanEventDTO, CheckpointDTO, ScanUserDTO, UserDTO } from "@/lib/types";
+import type {
+  EquipmentDTO,
+  ScanEventDTO,
+  CheckpointDTO,
+  ScanUserDTO,
+  UserDTO,
+  PortConnectionDTO,
+} from "@/lib/types";
+
+/** Include partilhado por todas as queries que depois passam por toEquipmentDTO. */
+export const EQUIPMENT_INCLUDE = {
+  scans: { include: { checkpoint: true, user: true } },
+  ports: true,
+} satisfies Prisma.EquipmentInclude;
 
 export type EquipmentWithScans = Prisma.EquipmentGetPayload<{
-  include: { scans: { include: { checkpoint: true; user: true } } };
+  include: typeof EQUIPMENT_INCLUDE;
 }>;
+
+function toPortConnectionDTO(p: EquipmentWithScans["ports"][number]): PortConnectionDTO {
+  return {
+    id: p.id,
+    order: p.order,
+    portType: p.portType,
+    etiquetaOrigem: p.etiquetaOrigem,
+    portaEtiquetaDestino: p.portaEtiquetaDestino,
+    patchPanelOrigem: p.patchPanelOrigem,
+    patchPanelDestino: p.patchPanelDestino,
+  };
+}
 
 function toCheckpointDTO(cp: {
   id: string;
@@ -82,6 +107,28 @@ export function toEquipmentDTO(
     status,
     currentCheckpoint: lastScan?.checkpoint ?? null,
     lastScan,
+    wave: equipment.wave,
+    equipmentType: equipment.equipmentType,
+    manufacturer: equipment.manufacturer,
+    assetTag: equipment.assetTag,
+    kvm: equipment.kvm,
+    powerCables: equipment.powerCables,
+    specialCables: equipment.specialCables,
+    arms: equipment.arms,
+    powerLocation: equipment.powerLocation,
+    cableConnection: equipment.cableConnection,
+    rails: equipment.rails,
+    originDatacenter: equipment.originDatacenter,
+    originEp: equipment.originEp,
+    originIsland: equipment.originIsland,
+    originRack: equipment.originRack,
+    originPosition: equipment.originPosition,
+    destinationDatacenter: equipment.destinationDatacenter,
+    destinationIpTelecom: equipment.destinationIpTelecom,
+    destinationIsland: equipment.destinationIsland,
+    destinationRack: equipment.destinationRack,
+    destinationPosition: equipment.destinationPosition,
+    ports: [...equipment.ports].sort((a, b) => a.order - b.order).map(toPortConnectionDTO),
     ...(opts.includeHistory ? { scans: sortedScans.map(toScanDTO) } : {}),
   };
 }

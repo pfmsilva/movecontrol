@@ -5,6 +5,7 @@ import { toEquipmentDTO } from "@/lib/serialize";
 import StatusBadge from "@/components/StatusBadge";
 import QRCodeDisplay from "@/components/QRCodeDisplay";
 import MovementTimeline from "@/components/MovementTimeline";
+import EquipmentFichaCard from "@/components/EquipmentFichaCard";
 
 interface Props {
   params: Promise<{ hostname: string }>;
@@ -19,6 +20,7 @@ export default async function EquipmentDetailPage({ params }: Props) {
       where: { hostname: decoded },
       include: {
         scans: { include: { checkpoint: true, user: true }, orderBy: { timestamp: "desc" } },
+        ports: true,
       },
     }),
     prisma.checkpoint.findFirst({ orderBy: { order: "desc" } }),
@@ -35,32 +37,35 @@ export default async function EquipmentDetailPage({ params }: Props) {
       </Link>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h1 className="text-2xl font-bold text-gray-900">{dto.hostname}</h1>
-            <StatusBadge status={dto.status} />
-          </div>
-          <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
-            <div>
-              <dt className="text-xs text-gray-400">Modelo</dt>
-              <dd className="text-gray-700">{dto.model ?? "—"}</dd>
+        <div className="space-y-6 lg:col-span-2">
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h1 className="text-2xl font-bold text-gray-900">{dto.hostname}</h1>
+              <StatusBadge status={dto.status} />
             </div>
-            <div>
-              <dt className="text-xs text-gray-400">Número de Série</dt>
-              <dd className="text-gray-700">{dto.serialNumber ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-gray-400">Localização Atual</dt>
-              <dd className="text-gray-700">{dto.currentCheckpoint?.name ?? "Pendente"}</dd>
-            </div>
-          </dl>
-          {dto.notes && <p className="mt-3 text-sm text-gray-600">{dto.notes}</p>}
+            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-xs text-gray-400">Modelo</dt>
+                <dd className="text-gray-700">{dto.model ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400">Wave</dt>
+                <dd className="text-gray-700">{dto.wave ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-gray-400">Localização Atual</dt>
+                <dd className="text-gray-700">{dto.currentCheckpoint?.name ?? "Pendente"}</dd>
+              </div>
+            </dl>
 
-          <h2 className="mb-3 mt-8 text-sm font-semibold text-gray-900">Timeline de Movimentação</h2>
-          <MovementTimeline scans={dto.scans ?? []} />
+            <h2 className="mb-3 mt-8 text-sm font-semibold text-gray-900">Timeline de Movimentação</h2>
+            <MovementTimeline scans={dto.scans ?? []} />
+          </div>
+
+          <EquipmentFichaCard equipment={dto} />
         </div>
 
-        <div className="flex flex-col items-center gap-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col items-center gap-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:sticky lg:top-20 lg:self-start">
           <p className="self-start text-sm font-semibold text-gray-900">QR Code do Equipamento</p>
           <QRCodeDisplay value={dto.hostname} size={200} showDownload />
           <Link

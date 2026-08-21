@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { toEquipmentDTO } from "@/lib/serialize";
+import { toEquipmentDTO, EQUIPMENT_INCLUDE } from "@/lib/serialize";
 import { auth } from "@/auth";
 import { canManageEquipment } from "@/lib/permissions";
 
@@ -12,7 +12,7 @@ export async function GET() {
 
   const [equipment, maxOrderCp] = await Promise.all([
     prisma.equipment.findMany({
-      include: { scans: { include: { checkpoint: true, user: true } } },
+      include: EQUIPMENT_INCLUDE,
       orderBy: { hostname: "asc" },
     }),
     prisma.checkpoint.findFirst({ orderBy: { order: "desc" } }),
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         serialNumber: serialNumber?.trim() || null,
         notes: notes?.trim() || null,
       },
-      include: { scans: { include: { checkpoint: true, user: true } } },
+      include: EQUIPMENT_INCLUDE,
     });
     return NextResponse.json(toEquipmentDTO(equipment, null), { status: 201 });
   } catch (err: unknown) {

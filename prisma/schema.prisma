@@ -15,6 +15,8 @@ datasource db {
 }
 
 /// Equipamento a movimentar. O hostname é o ID Único usado no QR Code.
+/// Campos alinhados com a "Ficha de Equipamento" (formulário em papel usado
+/// na migração física) para que a Vista de Impressão a possa reproduzir.
 model Equipment {
   id           String      @id @default(cuid())
   hostname     String      @unique
@@ -25,7 +27,63 @@ model Equipment {
   updatedAt    DateTime    @updatedAt
   scans        ScanEvent[]
 
+  /// Identificador da "wave"/lote de migração a que este equipamento pertence.
+  wave String?
+
+  // — Dados do Equipamento —
+  equipmentType   String? // Tipo Equipamento
+  manufacturer    String? // Fabricante
+  assetTag        String? // Etiqueta
+  kvm             String? // KVM
+  powerCables     String? // Cabos Power
+  specialCables   String? // Cabos Especiais
+  arms            String? // Braços
+  powerLocation   String? // Localização Power
+  cableConnection String? // Ligação Cabos
+  rails           String? // Calhas
+
+  // — Localização de Origem —
+  originDatacenter String?
+  originEp         String?
+  originIsland     String? // Ilha
+  originRack       String? // Bastidor
+  originPosition   String? // Posição
+
+  // — Localização de Destino —
+  destinationDatacenter String?
+  destinationIpTelecom  String? // IP Telecom
+  destinationIsland     String?
+  destinationRack       String?
+  destinationPosition   String?
+
+  ports PortConnection[]
+
   @@index([hostname])
+}
+
+/// Uma linha da tabela "Portas Ativas" da Ficha de Equipamento: um cabo/porta
+/// ligando o equipamento de origem ao de destino (e respetivo patch panel).
+model PortConnection {
+  id          String    @id @default(cuid())
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId String
+  order       Int // posição na tabela (1, 2, 3, …)
+
+  /// Tipo de porta usada neste cabo.
+  portType PortType?
+
+  etiquetaOrigem       String? // Etiqueta Origem
+  portaEtiquetaDestino String? // Porta/Etiqueta Equipamento Destino
+  patchPanelOrigem     String? // Porta Patch Panel — Origem
+  patchPanelDestino    String? // Porta Patch Panel — Destino
+
+  @@index([equipmentId])
+}
+
+enum PortType {
+  RJ45
+  FIBRA
+  OUTRAS
 }
 
 /// Ponto de controlo do processo de migração (ex: "Saída Origem",

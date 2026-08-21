@@ -44,11 +44,25 @@ Novos utilizadores, roles e checkpoints associados a Validadores geram-se em **U
 
 ## Modelo de dados (`prisma/schema.prisma`)
 
-- **Equipment** — o `hostname` é o **ID Único** codificado no QR Code.
+- **Equipment** — o `hostname` é o **ID Único** codificado no QR Code. Também guarda todos os
+  campos da **Ficha de Equipamento** em papel (tipo, fabricante, etiqueta, KVM, cabos, calhas,
+  localização de origem e destino) — ver [Ficha de Equipamento](#ficha-de-equipamento).
+- **PortConnection** — uma linha da tabela "Portas Ativas" da ficha (tipo de porta, etiquetas,
+  patch panel origem/destino); N equipamento → N portas.
 - **Checkpoint** — pontos de controlo, ordenados por `order` (o valor mais alto = "Concluído").
 - **User** — conta autenticada (`email` + `passwordHash` + `role`); é também o responsável pelo scan.
   Um `VALIDATOR` tem uma relação N-N (`validatorCheckpoints`) com os checkpoints que pode assumir.
 - **ScanEvent** — liga Equipment + Checkpoint + User + `timestamp`; é a fonte de verdade do histórico/timeline e da localização atual (último scan de cada equipamento).
+
+## Ficha de Equipamento
+
+No **Detalhe** de cada equipamento, a secção "Ficha de Equipamento" (ADMIN/CONTROLLER podem
+editar) replica o formulário em papel usado na migração física: dados do equipamento,
+localização de origem/destino e a tabela de portas ativas/cablagem (linhas adicionadas/removidas
+livremente). A **Vista de Impressão** tem um modo **"Ficha Completa (A4)"** que reproduz a ficha
+inteira com todos estes campos e o QR Code do equipamento no cabeçalho — para imprimir e
+acompanhar fisicamente a mudança. (O bloco de assinaturas/validação do formulário original não
+está incluído, por ser preenchido à mão no local.)
 
 ## Estrutura do projeto
 
