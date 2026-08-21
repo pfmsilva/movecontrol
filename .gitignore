@@ -28,3 +28,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# harness-local, not part of the project
+.claude/scheduled_tasks.lock
