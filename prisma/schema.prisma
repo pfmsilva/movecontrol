@@ -1,0 +1,66 @@
+// MoveControl — schema da base de dados
+// Rastreio de movimentação de equipamentos entre datacenters via QR Code
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // SQLite para desenvolvimento local. Para produção, troca o provider
+  // para "postgresql" e aponta DATABASE_URL para a tua instância Postgres.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Equipamento a movimentar. O hostname é o ID Único usado no QR Code.
+model Equipment {
+  id           String      @id @default(cuid())
+  hostname     String      @unique
+  model        String?
+  serialNumber String?
+  notes        String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  scans        ScanEvent[]
+
+  @@index([hostname])
+}
+
+/// Ponto de controlo do processo de migração (ex: "Saída Origem",
+/// "Em Trânsito", "Chegada Destino", "Instalado no Rack").
+/// `order` define a posição na timeline — o maior valor é considerado
+/// o checkpoint final (equipamento "Concluído").
+model Checkpoint {
+  id          String      @id @default(cuid())
+  name        String
+  order       Int         @unique
+  description String?
+  createdAt   DateTime    @default(now())
+  scans       ScanEvent[]
+}
+
+/// Utilizador responsável por efetuar os scans.
+model User {
+  id        String      @id @default(cuid())
+  name      String      @unique
+  email     String?
+  createdAt DateTime    @default(now())
+  scans     ScanEvent[]
+}
+
+/// Registo de leitura de QR Code: máquina + checkpoint + utilizador + timestamp.
+model ScanEvent {
+  id           String     @id @default(cuid())
+  equipment    Equipment  @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId  String
+  checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Cascade)
+  checkpointId String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  notes        String?
+  timestamp    DateTime   @default(now())
+
+  @@index([equipmentId])
+  @@index([checkpointId])
+  @@index([timestamp])
+}
