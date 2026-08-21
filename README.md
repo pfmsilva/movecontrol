@@ -11,6 +11,7 @@ equipamentos entre datacenters através do scan de QR Codes.
 - **Base de dados**: Prisma ORM + PostgreSQL (mesma BD em dev e produção — ver [Deploy no Vercel](#deploy-no-vercel))
 - **Scanner QR**: [`html5-qrcode`](https://github.com/mebjas/html5-qrcode) (câmara do telemóvel, no browser)
 - **Geração de QR**: [`react-qr-code`](https://github.com/rosskhanas/react-qr-code) + [`qrcode`](https://github.com/soldair/node-qrcode) (export PNG)
+- **Excel**: [`exceljs`](https://github.com/exceljs/exceljs) (exportação/importação de equipamentos)
 
 ## Autenticação e Roles
 
@@ -146,11 +147,21 @@ utilizador, mas regista a causa exata nos logs do servidor.
 2. **Checkpoints** — confirma/ajusta os pontos de controlo (já vêm 4 pré-configurados;
    criar/editar/eliminar é reservado a ADMIN/CONTROLLER).
 3. **Equipamentos** — regista cada equipamento pelo Nome/Hostname (ID Único) — ADMIN/CONTROLLER.
+   Também podes:
+   - **Exportar Excel** — descarrega todos os equipamentos e todos os campos (incluindo estado,
+     checkpoint atual, responsável e datas) — disponível para qualquer role autenticado.
+   - **Modelo de Importação** — descarrega um `.xlsx` com o cabeçalho certo e uma linha de
+     exemplo pré-preenchida (ADMIN/CONTROLLER).
+   - **Importar Excel** — carrega um `.xlsx` (o template ou o resultado de uma exportação
+     anterior) para criar/atualizar equipamentos em massa pelo `Hostname`; células em branco
+     mantêm o valor já existente em vez de o apagar. No fim mostra quantos foram criados,
+     quantos atualizados, e o detalhe de qualquer linha com erro (ADMIN/CONTROLLER).
 4. Abre o **Detalhe** do equipamento → **Abrir Vista de Impressão** → imprime a etiqueta (A4
    único ou folha com 8 etiquetas) e cola-a no equipamento.
 5. No telemóvel, abre **Scan** — o utilizador responsável é sempre a tua conta autenticada; um
-   Validador só vê os checkpoints que lhe foram associados. Ativa a câmara e aponta ao QR code —
-   cada leitura regista automaticamente máquina + checkpoint + utilizador + timestamp.
+   Validador só vê os checkpoints que lhe foram associados. Ativa a câmara e aponta ao QR code;
+   a app procura o equipamento e pede confirmação (mostra estado atual → novo checkpoint) antes
+   de gravar seja o que for — só depois de confirmares é que o scan fica registado.
 6. O **Dashboard** mostra em tempo (quase) real a localização atual de cada máquina, o
    progresso global (% concluído / em trânsito / pendente) e permite filtrar por
    checkpoint, estado ou pesquisar por nome.

@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import type { EquipmentDTO } from "@/lib/types";
 import StatusBadge from "@/components/StatusBadge";
 import { canManageEquipment } from "@/lib/permissions";
+
+interface ImportRowError {
+  rowNumber: number;
+  message: string;
+}
+
+interface ImportResult {
+  created: number;
+  updated: number;
+  errors: ImportRowError[];
+}
 
 export default function EquipmentPage() {
   const { data: session } = useSession();
@@ -17,6 +28,9 @@ export default function EquipmentPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ hostname: "", model: "", serialNumber: "", notes: "" });
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,6 +69,27 @@ export default function EquipmentPage() {
     load();
   }
 
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+
+    const body = new FormData();
+    body.append("file", file);
+    const res = await fetch("/api/equipment/import", { method: "POST", body });
+    const data = await res.json();
+    setImporting(false);
+    e.target.value = ""; // permite voltar a escolher o mesmo ficheiro
+
+    if (!res.ok) {
+      setImportResult({ created: 0, updated: 0, errors: [{ rowNumber: 0, message: data.error ?? "Erro ao importar." }] });
+      return;
+    }
+    setImportResult(data);
+    load();
+  }
+
   const filtered = equipment.filter((eq) => eq.hostname.toLowerCase().includes(search.trim().toLowerCase()));
 
   return (
@@ -65,16 +100,82 @@ export default function EquipmentPage() {
           <p className="text-sm text-gray-500">
             Regista equipamentos pelo Nome/Hostname (ID Único) e gera o respetivo QR Code.
           </p>
+          {canManage && (
+            <p className="mt-1 text-xs text-gray-400">
+              Descarrega o modelo de importação, preenche uma linha por equipamento e volta a
+              carregá-lo — células em branco mantêm o valor já existente.
+            </p>
+          )}
         </div>
-        {canManage && (
-          <button
-            onClick={() => setFormOpen((v) => !v)}
-            className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Downloads de ficheiro (rotas de API, não páginas) — <a> normal é o correto aqui. */}
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+          <a
+            href="/api/equipment/export"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            {formOpen ? "Cancelar" : "+ Registar Equipamento"}
-          </button>
-        )}
+            Exportar Excel
+          </a>
+          {canManage && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
+              <a
+                href="/api/equipment/import/template"
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Modelo de Importação
+              </a>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={importing}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                {importing ? "A importar…" : "Importar Excel"}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={handleImportFile}
+                className="hidden"
+              />
+              <button
+                onClick={() => setFormOpen((v) => !v)}
+                className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+              >
+                {formOpen ? "Cancelar" : "+ Registar Equipamento"}
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {importResult && (
+        <div
+          className={`rounded-xl border p-4 text-sm shadow-sm ${
+            importResult.errors.length > 0 ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <p className="font-semibold text-gray-800">
+              Importação concluída: {importResult.created} criado(s), {importResult.updated} atualizado(s).
+            </p>
+            <button onClick={() => setImportResult(null)} className="text-xs font-medium text-gray-500 hover:underline">
+              Fechar
+            </button>
+          </div>
+          {importResult.errors.length > 0 && (
+            <ul className="mt-2 list-disc space-y-0.5 pl-5 text-xs text-red-700">
+              {importResult.errors.map((e, i) => (
+                <li key={i}>
+                  {e.rowNumber > 0 ? `Linha ${e.rowNumber}: ` : ""}
+                  {e.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {canManage && formOpen && (
         <form onSubmit={handleSubmit} className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-2">
