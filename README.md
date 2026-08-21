@@ -8,7 +8,7 @@ equipamentos entre datacenters através do scan de QR Codes.
 - **Frontend**: Next.js 15 (App Router) + React 19 + Tailwind CSS
 - **Backend**: Next.js API Routes
 - **Autenticação**: [Auth.js / NextAuth v5](https://authjs.dev) (Credentials + JWT) com RBAC (3 roles)
-- **Base de dados**: Prisma ORM + SQLite (dev) — troca fácil para PostgreSQL em produção
+- **Base de dados**: Prisma ORM + PostgreSQL (mesma BD em dev e produção — ver [Deploy no Vercel](#deploy-no-vercel))
 - **Scanner QR**: [`html5-qrcode`](https://github.com/mebjas/html5-qrcode) (câmara do telemóvel, no browser)
 - **Geração de QR**: [`react-qr-code`](https://github.com/rosskhanas/react-qr-code) + [`qrcode`](https://github.com/soldair/node-qrcode) (export PNG)
 
@@ -84,30 +84,61 @@ src/
 
 ## Como correr localmente
 
+Precisas de uma base de dados Postgres (local ou na cloud — [Neon](https://neon.tech) e
+[Supabase](https://supabase.com) têm planos gratuitos e connection string pronta em ~2 minutos).
+
 ```bash
 npm install
-npx prisma migrate dev --name init   # cria a BD SQLite e corre o seed automaticamente
+cp .env.example .env   # depois edita DATABASE_URL e AUTH_SECRET no .env
+npx prisma migrate deploy   # aplica o schema à tua BD Postgres
+npm run seed                # opcional: checkpoints + 1 utilizador por role + equipamentos de exemplo
 npm run dev
 ```
 
 Abre [http://localhost:3000](http://localhost:3000) — vais ser redirecionado para `/login`.
-Usa uma das [credenciais de exemplo](#credenciais-de-exemplo-criadas-pelo-seed) acima.
+Usa uma das [credenciais de exemplo](#credenciais-de-exemplo-criadas-pelo-seed) acima (se correste o seed).
 
-Testado com `npm run build` (build de produção limpo) e verificado no browser: login/logout,
+Testado com `npx next build` (build de produção limpo) e verificado no browser: login/logout,
 as 3 roles (incluindo bloqueio de `/users` e de checkpoints não autorizados para Validador,
 testado também via chamada direta à API), dashboard, registo de equipamentos, geração/impressão
-de QR codes e o fluxo completo de scan.
+de QR codes e o fluxo completo de scan. A migração inicial para Postgres foi gerada com
+`prisma migrate diff --from-empty` (não precisa de ligação à BD) — não foi corrida contra uma
+instância Postgres real neste ambiente de geração, por não haver nenhuma disponível; corre
+`prisma migrate deploy` como primeiro passo para a aplicares e confirmares.
 
 > Nota: neste ambiente de geração o registo `registry.npmjs.org` estava a bloquear a ligação
 > (reset de TLS); a instalação foi feita com sucesso via `npm install --registry https://registry.yarnpkg.com`
 > (mirror oficial). No teu computador, `npm install` normal deve funcionar sem qualquer alteração.
 
-### Produção com PostgreSQL
+## Deploy no Vercel
 
-1. Muda `provider = "sqlite"` para `provider = "postgresql"` em `prisma/schema.prisma`.
-2. Define `DATABASE_URL` para a tua connection string Postgres.
-3. `npx prisma migrate deploy`.
-4. Define um `AUTH_SECRET` próprio (não uses o do `.env.example`/dev).
+O erro `There was a problem with the server configuration` no Vercel acontece por faltarem
+variáveis de ambiente/BD — segue estes passos:
+
+1. **Cria a base de dados** — no dashboard do Vercel, abre o projeto → separador **Storage** →
+   **Create Database** → escolhe **Postgres** (Neon) no marketplace. Isto associa
+   automaticamente a connection string ao projeto como variável de ambiente (normalmente
+   `DATABASE_URL`, ou `POSTGRES_URL`/`DATABASE_URL_UNPOOLED` consoante a integração — confirma o
+   nome exato em **Settings → Environment Variables** e garante que existe uma `DATABASE_URL`
+   com esse valor, para todos os ambientes: Production, Preview e Development).
+2. **Define o `AUTH_SECRET`** — em **Settings → Environment Variables**, adiciona `AUTH_SECRET`
+   com um valor gerado por `openssl rand -base64 33` (um segredo diferente do usado em dev).
+3. **Redeploy** — o script `build` (`prisma migrate deploy && next build`) aplica o schema à BD
+   automaticamente em cada deploy, por isso não precisas de correr migrações manualmente.
+4. **Cria o primeiro utilizador** — uma BD nova fica sem nenhum utilizador, e sem um ADMIN
+   ninguém consegue entrar nem criar contas pela app (problema do ovo e da galinha). Depois do
+   primeiro deploy com sucesso, corre o seed **localmente, apontado à BD de produção** (copia a
+   `DATABASE_URL` do Vercel para o teu `.env` local só para este passo):
+   ```bash
+   npm run seed
+   ```
+   Isto cria os 4 checkpoints, um utilizador por role (credenciais de exemplo acima) e os
+   equipamentos de demonstração — o comando é idempotente (`upsert`), podes correr de novo sem
+   duplicar dados. Muda a password do ADMIN (ou apaga as contas de exemplo) assim que entrares.
+
+Se o erro persistir depois disto, confirma nos **Logs** do Vercel (separador Deployments → o
+deployment → Runtime Logs) qual é o erro real — o Auth.js só mostra esta mensagem genérica ao
+utilizador, mas regista a causa exata nos logs do servidor.
 
 ## Fluxo de utilização
 

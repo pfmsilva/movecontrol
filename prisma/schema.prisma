@@ -6,9 +6,11 @@ generator client {
 }
 
 datasource db {
-  // SQLite para desenvolvimento local. Para produção, troca o provider
-  // para "postgresql" e aponta DATABASE_URL para a tua instância Postgres.
-  provider = "sqlite"
+  // Postgres — necessário para correr em Vercel (funções serverless têm
+  // sistema de ficheiros efémero, por isso SQLite não funciona em produção).
+  // Aponta DATABASE_URL para uma instância Postgres, tanto em dev como em prod
+  // (ex: Vercel Postgres / Neon / Supabase — ver README).
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
