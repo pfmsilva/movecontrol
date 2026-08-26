@@ -29,6 +29,11 @@ export default function MovementTimeline({ scans }: { scans: ScanEventDTO[] }) {
           </div>
           <p className="text-sm text-gray-500">
             Registado por {scan.user.name}
+            {scan.manual && (
+              <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                definido manualmente
+              </span>
+            )}
             {scan.pallet && (
               <>
                 {" "}

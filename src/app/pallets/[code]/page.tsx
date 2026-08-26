@@ -7,6 +7,7 @@ import QRCodeDisplay from "@/components/QRCodeDisplay";
 import PalletItemsManager from "@/components/PalletItemsManager";
 import PalletHistory from "@/components/PalletHistory";
 import StatusBadge from "@/components/StatusBadge";
+import ManualCheckpointControl from "@/components/ManualCheckpointControl";
 
 interface Props {
   params: Promise<{ code: string }>;
@@ -43,6 +44,8 @@ export default async function PalletDetailPage({ params }: Props) {
               Localização atual: {dto.currentCheckpoint ? dto.currentCheckpoint.name : "Pendente"}
             </p>
           </div>
+
+          <ManualCheckpointControl target={{ palletCode: dto.code }} />
 
           <PalletItemsManager pallet={dto} />
 

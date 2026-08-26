@@ -6,6 +6,7 @@ import StatusBadge from "@/components/StatusBadge";
 import QRCodeDisplay from "@/components/QRCodeDisplay";
 import MovementTimeline from "@/components/MovementTimeline";
 import EquipmentFichaCard from "@/components/EquipmentFichaCard";
+import ManualCheckpointControl from "@/components/ManualCheckpointControl";
 
 interface Props {
   params: Promise<{ hostname: string }>;
@@ -61,6 +62,8 @@ export default async function EquipmentDetailPage({ params }: Props) {
             <h2 className="mb-3 mt-8 text-sm font-semibold text-gray-900">Timeline de Movimentação</h2>
             <MovementTimeline scans={dto.scans ?? []} />
           </div>
+
+          <ManualCheckpointControl target={{ hostname: dto.hostname }} />
 
           <EquipmentFichaCard equipment={dto} />
         </div>

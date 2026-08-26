@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { isRestrictedValidator } from "@/lib/permissions";
+import { isRestrictedValidator, canSetCheckpointManually } from "@/lib/permissions";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -43,16 +43,23 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { hostname, palletCode, checkpointId, notes } = body ?? {};
+  const { hostname, palletCode, checkpointId, notes, manual } = body ?? {};
   // O utilizador responsável é sempre o da sessão autenticada — nunca confiar
   // num userId vindo do cliente.
   const userId = session.user.id;
+  const isManual = manual === true;
 
   if (!hostname && !palletCode) {
     return NextResponse.json({ error: "ID do equipamento ou da palete em falta no QR Code." }, { status: 400 });
   }
   if (!checkpointId) {
     return NextResponse.json({ error: "Seleciona o ponto de controlo (checkpoint) atual." }, { status: 400 });
+  }
+  // Só ADMIN/CONTROLLER podem definir um checkpoint manualmente (sem scan
+  // físico) — preserva o significado da flag e evita que um VALIDATOR a use
+  // para disfarçar um scan normal.
+  if (isManual && !canSetCheckpointManually(session.user.role)) {
+    return NextResponse.json({ error: "Não tens permissão para definir checkpoints manualmente." }, { status: 403 });
   }
 
   const checkpoint = await prisma.checkpoint.findUnique({ where: { id: checkpointId } });
@@ -101,6 +108,7 @@ export async function POST(req: NextRequest) {
         userId,
         palletId: pallet.id,
         notes: notes?.trim() || null,
+        manual: isManual,
         timestamp,
       })),
     });
@@ -112,6 +120,7 @@ export async function POST(req: NextRequest) {
         type: "CHECKPOINT_SCAN",
         checkpointId: checkpoint.id,
         userId,
+        manual: isManual,
         timestamp,
       },
     });
@@ -120,6 +129,7 @@ export async function POST(req: NextRequest) {
       {
         type: "pallet" as const,
         timestamp: timestamp.toISOString(),
+        manual: isManual,
         checkpoint: { id: checkpoint.id, name: checkpoint.name, order: checkpoint.order },
         user: { id: session.user.id, name: session.user.name },
         pallet: { id: pallet.id, code: pallet.code, label: pallet.label },
@@ -144,6 +154,7 @@ export async function POST(req: NextRequest) {
       checkpointId: checkpoint.id,
       userId,
       notes: notes?.trim() || null,
+      manual: isManual,
     },
     include: { checkpoint: true, user: true, equipment: true },
   });
@@ -154,6 +165,7 @@ export async function POST(req: NextRequest) {
       id: scan.id,
       timestamp: scan.timestamp.toISOString(),
       notes: scan.notes,
+      manual: scan.manual,
       equipment: { id: scan.equipment.id, hostname: scan.equipment.hostname },
       checkpoint: { id: scan.checkpoint.id, name: scan.checkpoint.name, order: scan.checkpoint.order },
       user: { id: scan.user.id, name: scan.user.name },

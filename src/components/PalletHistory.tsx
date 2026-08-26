@@ -63,7 +63,14 @@ export default function PalletHistory({ events }: { events: PalletEventDTO[] }) 
             {describe(e)}
             <time className="text-xs text-gray-400">{formatDateTime(e.timestamp)}</time>
           </div>
-          <p className="text-sm text-gray-500">Por {e.user.name}</p>
+          <p className="text-sm text-gray-500">
+            Por {e.user.name}
+            {e.manual && (
+              <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                definido manualmente
+              </span>
+            )}
+          </p>
         </li>
       ))}
     </ol>

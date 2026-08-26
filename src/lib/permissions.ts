@@ -20,6 +20,12 @@ export function canManagePallets(role: Role | undefined): boolean {
   return role === "ADMIN" || role === "CONTROLLER";
 }
 
+/** ADMIN e CONTROLLER podem definir manualmente o checkpoint de um equipamento
+ * ou palete, sem passar por um scan físico do QR Code. */
+export function canSetCheckpointManually(role: Role | undefined): boolean {
+  return role === "ADMIN" || role === "CONTROLLER";
+}
+
 /** VALIDATOR só pode assumir os checkpoints que lhe estão associados. */
 export function isRestrictedValidator(role: Role | undefined): boolean {
   return role === "VALIDATOR";

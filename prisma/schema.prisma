@@ -103,6 +103,10 @@ model PalletEvent {
   userId    String
   timestamp DateTime @default(now())
 
+  /// Em CHECKPOINT_SCAN: true se o checkpoint foi definido manualmente por um
+  /// ADMIN/CONTROLLER (sem scan físico do QR Code) — para rastreabilidade.
+  manual Boolean @default(false)
+
   @@index([palletId])
   @@index([timestamp])
 }
@@ -210,6 +214,10 @@ model ScanEvent {
   /// scan individual do equipamento) — para rastreabilidade na timeline.
   pallet   Pallet? @relation(fields: [palletId], references: [id], onDelete: SetNull)
   palletId String?
+
+  /// true se o checkpoint foi definido manualmente por um ADMIN/CONTROLLER
+  /// (sem scan físico do QR Code) — para rastreabilidade na timeline.
+  manual Boolean @default(false)
 
   @@index([equipmentId])
   @@index([checkpointId])

@@ -91,6 +91,16 @@ Numa migração física, vários equipamentos são muitas vezes movidos juntos n
   equipamentos alguma vez adicionados/removidos e todos os checkpoints por onde a palete passou
   — sempre com quem fez e o timestamp exato (modelo `PalletEvent`).
 
+### Definir Checkpoint Manualmente
+
+No detalhe de um equipamento ou de uma palete, ADMIN/CONTROLLER têm uma secção **"Definir
+Checkpoint Manualmente"** — escolhem um checkpoint e aplicam-no diretamente, sem precisar de
+apontar a câmara a um QR Code (útil para corrigir um estado ou para situações em que o scan
+físico não é possível). Reutiliza o mesmo `POST /api/scans` do fluxo normal, por isso fica
+gravado nos mesmos sítios que um scan real (`ScanEvent`/`PalletEvent`) — só que marcado com
+`manual: true`, mostrado como uma etiqueta "definido manualmente" na timeline/histórico. Só
+ADMIN/CONTROLLER podem usar esta flag (reforçado também na API, não só na UI).
+
 Tecnicamente, o QR de uma palete codifica `PALETE:<código>` (o de um equipamento continua a ser
 só o hostname) — é assim que o scan distingue os dois tipos de leitura.
 

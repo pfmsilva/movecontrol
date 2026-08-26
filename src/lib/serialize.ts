@@ -89,6 +89,7 @@ function toScanDTO(
     checkpoint: toCheckpointDTO(s.checkpoint),
     user: toScanUserDTO(s.user),
     pallet: toPalletRefDTO(s.pallet),
+    manual: s.manual,
   };
 }
 
@@ -171,6 +172,7 @@ function toPalletEventDTO(e: PalletWithItems["events"][number]): PalletEventDTO 
     user: toScanUserDTO(e.user),
     equipment: e.equipment ? { id: e.equipment.id, hostname: e.equipment.hostname } : null,
     checkpoint: e.checkpoint ? toCheckpointDTO(e.checkpoint) : null,
+    manual: e.manual,
   };
 }
 

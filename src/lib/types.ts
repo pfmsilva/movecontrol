@@ -46,6 +46,8 @@ export interface ScanEventDTO {
   user: ScanUserDTO;
   /** Não nulo quando este scan resultou de um scan de Palete. */
   pallet: PalletRefDTO | null;
+  /** true se o checkpoint foi definido manualmente (sem scan físico do QR Code). */
+  manual: boolean;
 }
 
 /** Prefixo usado no conteúdo do QR Code de uma Palete, para o distinguir do
@@ -68,6 +70,8 @@ export interface PalletEventDTO {
   user: ScanUserDTO;
   equipment: { id: string; hostname: string } | null;
   checkpoint: CheckpointDTO | null;
+  /** Em CHECKPOINT_SCAN: true se foi definido manualmente (sem scan físico do QR Code). */
+  manual: boolean;
 }
 
 export const PALLET_EVENT_LABELS: Record<PalletEventType, string> = {
