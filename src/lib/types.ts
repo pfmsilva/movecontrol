@@ -1,6 +1,6 @@
-import type { Role, PortType } from "@prisma/client";
+import type { Role, PortType, PalletEventType } from "@prisma/client";
 
-export type { Role, PortType };
+export type { Role, PortType, PalletEventType };
 
 export type EquipmentStatus = "pending" | "in_transit" | "completed";
 
@@ -60,13 +60,32 @@ export interface PalletEquipmentRefDTO {
   currentCheckpoint: CheckpointDTO | null;
 }
 
+/** Uma entrada do log de auditoria de uma palete. */
+export interface PalletEventDTO {
+  id: string;
+  type: PalletEventType;
+  timestamp: string;
+  user: ScanUserDTO;
+  equipment: { id: string; hostname: string } | null;
+  checkpoint: CheckpointDTO | null;
+}
+
+export const PALLET_EVENT_LABELS: Record<PalletEventType, string> = {
+  ITEM_ADDED: "Equipamento adicionado",
+  ITEM_REMOVED: "Equipamento removido",
+  CHECKPOINT_SCAN: "Checkpoint",
+};
+
 export interface PalletDTO {
   id: string;
   code: string;
   label: string | null;
   notes: string | null;
   createdAt: string;
+  status: EquipmentStatus;
+  currentCheckpoint: CheckpointDTO | null;
   items: PalletEquipmentRefDTO[];
+  events: PalletEventDTO[];
 }
 
 export interface PalletSummaryDTO {
@@ -75,6 +94,7 @@ export interface PalletSummaryDTO {
   label: string | null;
   notes: string | null;
   createdAt: string;
+  status: EquipmentStatus;
   itemCount: number;
   hostnames: string[];
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import type { PalletSummaryDTO } from "@/lib/types";
 import { canManagePallets } from "@/lib/permissions";
+import StatusBadge from "@/components/StatusBadge";
 
 export default function PalletsPage() {
   const { data: session } = useSession();
@@ -121,6 +122,7 @@ export default function PalletsPage() {
               <tr>
                 <th className="px-4 py-3">Código</th>
                 <th className="px-4 py-3">Etiqueta</th>
+                <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3">Equipamentos</th>
                 <th className="px-4 py-3 text-right">Ações</th>
               </tr>
@@ -130,6 +132,9 @@ export default function PalletsPage() {
                 <tr key={p.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-semibold text-gray-900">{p.code}</td>
                   <td className="px-4 py-3 text-gray-500">{p.label ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <StatusBadge status={p.status} />
+                  </td>
                   <td className="px-4 py-3 text-gray-500">
                     <span className="font-medium text-gray-700">{p.itemCount}</span>{" "}
                     {p.itemCount > 0 && (

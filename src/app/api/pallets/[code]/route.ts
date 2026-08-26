@@ -45,6 +45,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Palete não encontrada." }, { status: 404 });
   }
 
+  // Nota: esta substituição em bloco da lista de equipamentos não gera
+  // entradas no log de auditoria (PalletEvent) — não está exposta em
+  // nenhuma UI atual; adicionar/remover um de cada vez via /items é o
+  // caminho usado pela aplicação e esse sim fica registado.
   let itemsUpdate = {};
   if (Array.isArray(equipmentHostnames)) {
     const equipment = await prisma.equipment.findMany({

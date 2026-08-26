@@ -84,6 +84,12 @@ Numa migração física, vários equipamentos são muitas vezes movidos juntos n
 - Um equipamento **acompanha o estado da palete** enquanto lá estiver dentro: só é incluído num
   scan de palete enquanto for membro no momento da leitura — se for removido antes de um scan
   posterior, deixa de receber essa atualização e passa a seguir o seu próprio histórico.
+- A **própria palete tem um estado** (Pendente/Em Trânsito/Concluído, mesmo badge usado nos
+  equipamentos), derivado do último checkpoint por onde passou — visível na listagem e no
+  detalhe, com a "Localização atual".
+- O detalhe da palete tem um **"Histórico da Palete"**: log de auditoria completo com todos os
+  equipamentos alguma vez adicionados/removidos e todos os checkpoints por onde a palete passou
+  — sempre com quem fez e o timestamp exato (modelo `PalletEvent`).
 
 Tecnicamente, o QR de uma palete codifica `PALETE:<código>` (o de um equipamento continua a ser
 só o hostname) — é assim que o scan distingue os dois tipos de leitura.

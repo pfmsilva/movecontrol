@@ -58,6 +58,7 @@ model Equipment {
 
   ports        PortConnection[]
   palletItems  PalletItem[]
+  palletEvents PalletEvent[]
 
   @@index([hostname])
 }
@@ -67,16 +68,49 @@ model Equipment {
 /// QR da palete regista o checkpoint para todos os equipamentos lá dentro de
 /// uma só vez.
 model Pallet {
-  id        String       @id @default(cuid())
+  id        String        @id @default(cuid())
   /// Código único da palete (ex: "PAL-0001") — é o conteúdo codificado no QR.
-  code      String       @unique
+  code      String        @unique
   label     String?
   notes     String?
-  createdAt DateTime     @default(now())
+  createdAt DateTime      @default(now())
   items     PalletItem[]
   scans     ScanEvent[]
+  /// Log de auditoria: equipamentos adicionados/removidos e checkpoints por
+  /// onde a palete passou (quem fez, quando). É também a partir daqui que se
+  /// deriva o estado atual da palete (último CHECKPOINT_SCAN).
+  events    PalletEvent[]
 
   @@index([code])
+}
+
+/// Uma entrada do log de auditoria de uma Palete.
+model PalletEvent {
+  id       String          @id @default(cuid())
+  pallet   Pallet          @relation(fields: [palletId], references: [id], onDelete: Cascade)
+  palletId String
+  type     PalletEventType
+
+  /// Preenchido em ITEM_ADDED / ITEM_REMOVED — o equipamento em causa.
+  equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  equipmentId String?
+
+  /// Preenchido em CHECKPOINT_SCAN — o checkpoint atingido pela palete.
+  checkpoint   Checkpoint? @relation(fields: [checkpointId], references: [id], onDelete: SetNull)
+  checkpointId String?
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  timestamp DateTime @default(now())
+
+  @@index([palletId])
+  @@index([timestamp])
+}
+
+enum PalletEventType {
+  ITEM_ADDED
+  ITEM_REMOVED
+  CHECKPOINT_SCAN
 }
 
 /// Associação entre uma Palete e um Equipamento (N-N).
@@ -123,15 +157,16 @@ enum PortType {
 /// `order` define a posição na timeline — o maior valor é considerado
 /// o checkpoint final (equipamento "Concluído").
 model Checkpoint {
-  id          String      @id @default(cuid())
-  name        String
-  order       Int         @unique
-  description String?
-  createdAt   DateTime    @default(now())
-  scans       ScanEvent[]
+  id           String        @id @default(cuid())
+  name         String
+  order        Int           @unique
+  description  String?
+  createdAt    DateTime      @default(now())
+  scans        ScanEvent[]
+  palletEvents PalletEvent[]
 
   /// Utilizadores (VALIDATOR) autorizados a assumir este checkpoint.
-  validators  User[]      @relation("ValidatorCheckpoints")
+  validators User[] @relation("ValidatorCheckpoints")
 }
 
 /// Papel de acesso do utilizador na aplicação.
@@ -146,13 +181,14 @@ enum Role {
 
 /// Utilizador autenticado, responsável por efetuar os scans.
 model User {
-  id           String       @id @default(cuid())
+  id           String        @id @default(cuid())
   name         String
-  email        String       @unique
+  email        String        @unique
   passwordHash String
-  role         Role         @default(VALIDATOR)
-  createdAt    DateTime     @default(now())
+  role         Role          @default(VALIDATOR)
+  createdAt    DateTime      @default(now())
   scans        ScanEvent[]
+  palletEvents PalletEvent[]
 
   /// Checkpoints que este utilizador pode assumir quando faz scans (relevante para VALIDATOR).
   validatorCheckpoints Checkpoint[] @relation("ValidatorCheckpoints")

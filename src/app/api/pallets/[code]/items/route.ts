@@ -8,6 +8,14 @@ interface Params {
   params: Promise<{ code: string }>;
 }
 
+async function respond(palletId: string) {
+  const [updated, maxOrderCp] = await Promise.all([
+    prisma.pallet.findUniqueOrThrow({ where: { id: palletId }, include: PALLET_ITEM_INCLUDE }),
+    prisma.checkpoint.findFirst({ orderBy: { order: "desc" } }),
+  ]);
+  return NextResponse.json(toPalletDTO(updated, maxOrderCp?.order ?? null));
+}
+
 export async function POST(req: NextRequest, { params }: Params) {
   const session = await auth();
   if (!session?.user || !canManagePallets(session.user.role)) {
@@ -33,6 +41,15 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   try {
     await prisma.palletItem.create({ data: { palletId: pallet.id, equipmentId: equipment.id } });
+    // Regista no log de auditoria — só quando a adição foi mesmo nova (não em conflito).
+    await prisma.palletEvent.create({
+      data: {
+        palletId: pallet.id,
+        type: "ITEM_ADDED",
+        equipmentId: equipment.id,
+        userId: session.user.id,
+      },
+    });
   } catch (err: unknown) {
     const isConflict =
       typeof err === "object" && err !== null && "code" in err && (err as { code: string }).code === "P2002";
@@ -42,8 +59,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     // já estava na palete — ignora silenciosamente
   }
 
-  const updated = await prisma.pallet.findUniqueOrThrow({ where: { id: pallet.id }, include: PALLET_ITEM_INCLUDE });
-  return NextResponse.json(toPalletDTO(updated, null));
+  return respond(pallet.id);
 }
 
 export async function DELETE(req: NextRequest, { params }: Params) {
@@ -65,9 +81,21 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   const equipment = await prisma.equipment.findUnique({ where: { hostname: hostname.trim() } });
   if (equipment) {
-    await prisma.palletItem.deleteMany({ where: { palletId: pallet.id, equipmentId: equipment.id } });
+    const { count } = await prisma.palletItem.deleteMany({
+      where: { palletId: pallet.id, equipmentId: equipment.id },
+    });
+    if (count > 0) {
+      // Só regista no log se o equipamento era mesmo membro (removeu algo a sério).
+      await prisma.palletEvent.create({
+        data: {
+          palletId: pallet.id,
+          type: "ITEM_REMOVED",
+          equipmentId: equipment.id,
+          userId: session.user.id,
+        },
+      });
+    }
   }
 
-  const updated = await prisma.pallet.findUniqueOrThrow({ where: { id: pallet.id }, include: PALLET_ITEM_INCLUDE });
-  return NextResponse.json(toPalletDTO(updated, null));
+  return respond(pallet.id);
 }

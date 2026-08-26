@@ -11,6 +11,7 @@ import type {
   PalletDTO,
   PalletSummaryDTO,
   PalletEquipmentRefDTO,
+  PalletEventDTO,
   EquipmentStatus,
 } from "@/lib/types";
 
@@ -154,11 +155,37 @@ export const PALLET_ITEM_INCLUDE = {
       },
     },
   },
+  events: {
+    include: { equipment: { select: { id: true, hostname: true } }, checkpoint: true, user: true },
+    orderBy: { timestamp: "desc" },
+  },
 } satisfies Prisma.PalletInclude;
 
 export type PalletWithItems = Prisma.PalletGetPayload<{ include: typeof PALLET_ITEM_INCLUDE }>;
 
-/** Converte uma Palete (com items + equipamentos incluídos) num PalletDTO. */
+function toPalletEventDTO(e: PalletWithItems["events"][number]): PalletEventDTO {
+  return {
+    id: e.id,
+    type: e.type,
+    timestamp: e.timestamp.toISOString(),
+    user: toScanUserDTO(e.user),
+    equipment: e.equipment ? { id: e.equipment.id, hostname: e.equipment.hostname } : null,
+    checkpoint: e.checkpoint ? toCheckpointDTO(e.checkpoint) : null,
+  };
+}
+
+/** Deriva o estado/checkpoint atual da palete a partir do seu próprio log (CHECKPOINT_SCAN mais recente). */
+function derivePalletCheckpoint(
+  events: PalletWithItems["events"],
+  maxCheckpointOrder: number | null
+): { status: EquipmentStatus; currentCheckpoint: CheckpointDTO | null } {
+  const lastScan = events.find((e) => e.type === "CHECKPOINT_SCAN" && e.checkpoint);
+  const currentCheckpoint = lastScan?.checkpoint ? toCheckpointDTO(lastScan.checkpoint) : null;
+  const status = deriveStatus(currentCheckpoint?.order ?? null, maxCheckpointOrder);
+  return { status, currentCheckpoint };
+}
+
+/** Converte uma Palete (com items + equipamentos + log incluídos) num PalletDTO. */
 export function toPalletDTO(pallet: PalletWithItems, maxCheckpointOrder: number | null): PalletDTO {
   const items: PalletEquipmentRefDTO[] = pallet.items.map(({ equipment }) => {
     const lastScan = equipment.scans[0] ?? null;
@@ -172,30 +199,45 @@ export function toPalletDTO(pallet: PalletWithItems, maxCheckpointOrder: number 
     };
   });
 
+  const { status, currentCheckpoint } = derivePalletCheckpoint(pallet.events, maxCheckpointOrder);
+
   return {
     id: pallet.id,
     code: pallet.code,
     label: pallet.label,
     notes: pallet.notes,
     createdAt: pallet.createdAt.toISOString(),
+    status,
+    currentCheckpoint,
     items,
+    events: pallet.events.map(toPalletEventDTO),
   };
 }
 
 export const PALLET_SUMMARY_INCLUDE = {
   items: { include: { equipment: { select: { hostname: true } } } },
+  events: {
+    where: { type: "CHECKPOINT_SCAN" as const },
+    include: { checkpoint: true },
+    orderBy: { timestamp: "desc" },
+    take: 1,
+  },
 } satisfies Prisma.PalletInclude;
 
 export type PalletWithHostnames = Prisma.PalletGetPayload<{ include: typeof PALLET_SUMMARY_INCLUDE }>;
 
-/** Versão reduzida (para listagens) — sem precisar de calcular o estado de cada equipamento. */
-export function toPalletSummaryDTO(pallet: PalletWithHostnames): PalletSummaryDTO {
+/** Versão reduzida (para listagens) — sem precisar do log completo de cada palete. */
+export function toPalletSummaryDTO(pallet: PalletWithHostnames, maxCheckpointOrder: number | null): PalletSummaryDTO {
+  const lastScan = pallet.events[0] ?? null;
+  const status = deriveStatus(lastScan?.checkpoint?.order ?? null, maxCheckpointOrder);
+
   return {
     id: pallet.id,
     code: pallet.code,
     label: pallet.label,
     notes: pallet.notes,
     createdAt: pallet.createdAt.toISOString(),
+    status,
     itemCount: pallet.items.length,
     hostnames: pallet.items.map((i) => i.equipment.hostname),
   };

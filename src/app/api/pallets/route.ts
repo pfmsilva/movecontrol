@@ -10,11 +10,15 @@ export async function GET() {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
-  const pallets = await prisma.pallet.findMany({
-    include: PALLET_SUMMARY_INCLUDE,
-    orderBy: { createdAt: "desc" },
-  });
-  return NextResponse.json(pallets.map(toPalletSummaryDTO));
+  const [pallets, maxOrderCp] = await Promise.all([
+    prisma.pallet.findMany({
+      include: PALLET_SUMMARY_INCLUDE,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.checkpoint.findFirst({ orderBy: { order: "desc" } }),
+  ]);
+  const maxOrder = maxOrderCp?.order ?? null;
+  return NextResponse.json(pallets.map((p) => toPalletSummaryDTO(p, maxOrder)));
 }
 
 async function generatePalletCode(): Promise<string> {

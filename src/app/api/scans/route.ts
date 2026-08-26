@@ -104,6 +104,17 @@ export async function POST(req: NextRequest) {
         timestamp,
       })),
     });
+    // Uma única entrada no log da palete para este scan (é o que define o seu
+    // estado atual), distinta das N ScanEvent criadas acima por equipamento.
+    await prisma.palletEvent.create({
+      data: {
+        palletId: pallet.id,
+        type: "CHECKPOINT_SCAN",
+        checkpointId: checkpoint.id,
+        userId,
+        timestamp,
+      },
+    });
 
     return NextResponse.json(
       {
