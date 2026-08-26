@@ -231,7 +231,8 @@ export type PalletWithHostnames = Prisma.PalletGetPayload<{ include: typeof PALL
 /** Versão reduzida (para listagens) — sem precisar do log completo de cada palete. */
 export function toPalletSummaryDTO(pallet: PalletWithHostnames, maxCheckpointOrder: number | null): PalletSummaryDTO {
   const lastScan = pallet.events[0] ?? null;
-  const status = deriveStatus(lastScan?.checkpoint?.order ?? null, maxCheckpointOrder);
+  const currentCheckpoint = lastScan?.checkpoint ? toCheckpointDTO(lastScan.checkpoint) : null;
+  const status = deriveStatus(currentCheckpoint?.order ?? null, maxCheckpointOrder);
 
   return {
     id: pallet.id,
@@ -240,6 +241,7 @@ export function toPalletSummaryDTO(pallet: PalletWithHostnames, maxCheckpointOrd
     notes: pallet.notes,
     createdAt: pallet.createdAt.toISOString(),
     status,
+    currentCheckpoint,
     itemCount: pallet.items.length,
     hostnames: pallet.items.map((i) => i.equipment.hostname),
   };

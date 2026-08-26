@@ -216,6 +216,13 @@ utilizador, mas regista a causa exata nos logs do servidor.
    Validador só vê os checkpoints que lhe foram associados. Ativa a câmara e aponta ao QR code;
    a app procura o equipamento e pede confirmação (mostra estado atual → novo checkpoint) antes
    de gravar seja o que for — só depois de confirmares é que o scan fica registado.
-6. O **Dashboard** mostra em tempo (quase) real a localização atual de cada máquina, o
-   progresso global (% concluído / em trânsito / pendente) e permite filtrar por
-   checkpoint, estado ou pesquisar por nome.
+6. O **Dashboard** tem uma secção **Equipamentos** e uma secção **Paletes**, cada uma com o seu
+   progresso global (% concluído / em trânsito / pendente), filtros por checkpoint/estado/pesquisa
+   e a respetiva tabela, em tempo (quase) real.
+7. ADMIN/CONTROLLER podem selecionar **vários equipamentos e/ou várias paletes** de uma vez
+   (checkbox por linha, em qualquer uma das duas tabelas do Dashboard) e aplicar-lhes o mesmo
+   checkpoint manualmente numa só ação — útil para corrigir vários estados de seguida sem repetir
+   o processo um a um. Fica tudo registado nos mesmos logs que uma atualização manual individual
+   (ver [Definir Checkpoint Manualmente](#definir-checkpoint-manualmente)), e o resultado mostra
+   quantos foram atualizados com sucesso e o detalhe de qualquer erro (ex: palete sem
+   equipamentos).

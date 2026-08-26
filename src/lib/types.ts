@@ -99,8 +99,17 @@ export interface PalletSummaryDTO {
   notes: string | null;
   createdAt: string;
   status: EquipmentStatus;
+  currentCheckpoint: CheckpointDTO | null;
   itemCount: number;
   hostnames: string[];
+}
+
+/** Resultado de uma atualização manual de checkpoint em lote. */
+export interface BulkCheckpointResultDTO {
+  checkpoint: CheckpointDTO;
+  updatedEquipment: string[];
+  updatedPallets: string[];
+  errors: { target: string; message: string }[];
 }
 
 export interface PortConnectionDTO {

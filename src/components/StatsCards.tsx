@@ -1,8 +1,14 @@
 import type { StatsDTO } from "@/lib/types";
 
-export default function StatsCards({ stats }: { stats: StatsDTO }) {
+export default function StatsCards({
+  stats,
+  totalLabel = "Total de Equipamentos",
+}: {
+  stats: StatsDTO;
+  totalLabel?: string;
+}) {
   const cards = [
-    { label: "Total de Equipamentos", value: stats.total, sub: null, color: "text-gray-900" },
+    { label: totalLabel, value: stats.total, sub: null, color: "text-gray-900" },
     { label: "Pendentes", value: stats.pending, sub: `${stats.pendingPct}%`, color: "text-gray-600" },
     { label: "Em Trânsito", value: stats.inTransit, sub: `${stats.inTransitPct}%`, color: "text-amber-600" },
     { label: "Concluídos", value: stats.completed, sub: `${stats.completedPct}%`, color: "text-emerald-600" },

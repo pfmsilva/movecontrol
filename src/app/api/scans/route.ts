@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { isRestrictedValidator, canSetCheckpointManually } from "@/lib/permissions";
+import { recordEquipmentCheckpoint, recordPalletCheckpoint } from "@/lib/scanning";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -100,29 +101,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Esta palete não tem nenhum equipamento associado." }, { status: 400 });
     }
 
-    const timestamp = new Date();
-    await prisma.scanEvent.createMany({
-      data: pallet.items.map((item) => ({
-        equipmentId: item.equipmentId,
-        checkpointId: checkpoint.id,
-        userId,
-        palletId: pallet.id,
-        notes: notes?.trim() || null,
-        manual: isManual,
-        timestamp,
-      })),
-    });
-    // Uma única entrada no log da palete para este scan (é o que define o seu
-    // estado atual), distinta das N ScanEvent criadas acima por equipamento.
-    await prisma.palletEvent.create({
-      data: {
-        palletId: pallet.id,
-        type: "CHECKPOINT_SCAN",
-        checkpointId: checkpoint.id,
-        userId,
-        manual: isManual,
-        timestamp,
-      },
+    const timestamp = await recordPalletCheckpoint({
+      pallet,
+      checkpointId: checkpoint.id,
+      userId,
+      manual: isManual,
+      notes,
     });
 
     return NextResponse.json(
@@ -148,15 +132,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const scan = await prisma.scanEvent.create({
-    data: {
-      equipmentId: equipment.id,
-      checkpointId: checkpoint.id,
-      userId,
-      notes: notes?.trim() || null,
-      manual: isManual,
-    },
-    include: { checkpoint: true, user: true, equipment: true },
+  const scan = await recordEquipmentCheckpoint({
+    equipmentId: equipment.id,
+    checkpointId: checkpoint.id,
+    userId,
+    manual: isManual,
+    notes,
   });
 
   return NextResponse.json(
@@ -166,9 +147,9 @@ export async function POST(req: NextRequest) {
       timestamp: scan.timestamp.toISOString(),
       notes: scan.notes,
       manual: scan.manual,
-      equipment: { id: scan.equipment.id, hostname: scan.equipment.hostname },
-      checkpoint: { id: scan.checkpoint.id, name: scan.checkpoint.name, order: scan.checkpoint.order },
-      user: { id: scan.user.id, name: scan.user.name },
+      equipment: { id: equipment.id, hostname: equipment.hostname },
+      checkpoint: { id: checkpoint.id, name: checkpoint.name, order: checkpoint.order },
+      user: { id: session.user.id, name: session.user.name },
     },
     { status: 201 }
   );
