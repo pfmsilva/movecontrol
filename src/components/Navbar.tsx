@@ -9,6 +9,7 @@ import { ROLE_LABELS } from "@/lib/permissions";
 const ALL_LINKS = [
   { href: "/", label: "Dashboard" },
   { href: "/equipment", label: "Equipamentos" },
+  { href: "/pallets", label: "Paletes" },
   { href: "/checkpoints", label: "Checkpoints" },
   { href: "/users", label: "Utilizadores", adminOnly: true },
 ];

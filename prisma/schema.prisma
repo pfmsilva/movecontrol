@@ -56,9 +56,41 @@ model Equipment {
   destinationRack       String?
   destinationPosition   String?
 
-  ports PortConnection[]
+  ports        PortConnection[]
+  palletItems  PalletItem[]
 
   @@index([hostname])
+}
+
+/// Palete física que pode agrupar vários equipamentos para serem movidos em
+/// conjunto numa fase da migração. Tem a sua própria ficha/QR: fazer scan do
+/// QR da palete regista o checkpoint para todos os equipamentos lá dentro de
+/// uma só vez.
+model Pallet {
+  id        String       @id @default(cuid())
+  /// Código único da palete (ex: "PAL-0001") — é o conteúdo codificado no QR.
+  code      String       @unique
+  label     String?
+  notes     String?
+  createdAt DateTime     @default(now())
+  items     PalletItem[]
+  scans     ScanEvent[]
+
+  @@index([code])
+}
+
+/// Associação entre uma Palete e um Equipamento (N-N).
+model PalletItem {
+  id          String    @id @default(cuid())
+  pallet      Pallet    @relation(fields: [palletId], references: [id], onDelete: Cascade)
+  palletId    String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  equipmentId String
+  addedAt     DateTime  @default(now())
+
+  @@unique([palletId, equipmentId])
+  @@index([palletId])
+  @@index([equipmentId])
 }
 
 /// Uma linha da tabela "Portas Ativas" da Ficha de Equipamento: um cabo/porta
@@ -138,7 +170,13 @@ model ScanEvent {
   notes        String?
   timestamp    DateTime   @default(now())
 
+  /// Preenchido quando este scan resultou de um scan de Palete (em vez de um
+  /// scan individual do equipamento) — para rastreabilidade na timeline.
+  pallet   Pallet? @relation(fields: [palletId], references: [id], onDelete: SetNull)
+  palletId String?
+
   @@index([equipmentId])
   @@index([checkpointId])
   @@index([timestamp])
+  @@index([palletId])
 }

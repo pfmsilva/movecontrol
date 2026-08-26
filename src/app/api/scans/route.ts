@@ -43,24 +43,16 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { hostname, checkpointId, notes } = body ?? {};
+  const { hostname, palletCode, checkpointId, notes } = body ?? {};
   // O utilizador responsável é sempre o da sessão autenticada — nunca confiar
   // num userId vindo do cliente.
   const userId = session.user.id;
 
-  if (!hostname || typeof hostname !== "string") {
-    return NextResponse.json({ error: "ID do equipamento (hostname) em falta no QR Code." }, { status: 400 });
+  if (!hostname && !palletCode) {
+    return NextResponse.json({ error: "ID do equipamento ou da palete em falta no QR Code." }, { status: 400 });
   }
   if (!checkpointId) {
     return NextResponse.json({ error: "Seleciona o ponto de controlo (checkpoint) atual." }, { status: 400 });
-  }
-
-  const equipment = await prisma.equipment.findUnique({ where: { hostname: hostname.trim() } });
-  if (!equipment) {
-    return NextResponse.json(
-      { error: `Equipamento "${hostname}" não encontrado. Regista-o primeiro em Equipamentos.`, code: "EQUIPMENT_NOT_FOUND" },
-      { status: 404 }
-    );
   }
 
   const checkpoint = await prisma.checkpoint.findUnique({ where: { id: checkpointId } });
@@ -84,6 +76,57 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // — Scan de uma Palete: regista o mesmo checkpoint para todos os
+  // equipamentos lá dentro, de uma só vez. —
+  if (palletCode) {
+    const pallet = await prisma.pallet.findUnique({
+      where: { code: String(palletCode).trim() },
+      include: { items: { include: { equipment: true } } },
+    });
+    if (!pallet) {
+      return NextResponse.json(
+        { error: `Palete "${palletCode}" não encontrada.`, code: "PALLET_NOT_FOUND" },
+        { status: 404 }
+      );
+    }
+    if (pallet.items.length === 0) {
+      return NextResponse.json({ error: "Esta palete não tem nenhum equipamento associado." }, { status: 400 });
+    }
+
+    const timestamp = new Date();
+    await prisma.scanEvent.createMany({
+      data: pallet.items.map((item) => ({
+        equipmentId: item.equipmentId,
+        checkpointId: checkpoint.id,
+        userId,
+        palletId: pallet.id,
+        notes: notes?.trim() || null,
+        timestamp,
+      })),
+    });
+
+    return NextResponse.json(
+      {
+        type: "pallet" as const,
+        timestamp: timestamp.toISOString(),
+        checkpoint: { id: checkpoint.id, name: checkpoint.name, order: checkpoint.order },
+        user: { id: session.user.id, name: session.user.name },
+        pallet: { id: pallet.id, code: pallet.code, label: pallet.label },
+        equipment: pallet.items.map((i) => ({ id: i.equipment.id, hostname: i.equipment.hostname })),
+      },
+      { status: 201 }
+    );
+  }
+
+  // — Scan individual de um Equipamento —
+  const equipment = await prisma.equipment.findUnique({ where: { hostname: String(hostname).trim() } });
+  if (!equipment) {
+    return NextResponse.json(
+      { error: `Equipamento "${hostname}" não encontrado. Regista-o primeiro em Equipamentos.`, code: "EQUIPMENT_NOT_FOUND" },
+      { status: 404 }
+    );
+  }
+
   const scan = await prisma.scanEvent.create({
     data: {
       equipmentId: equipment.id,
@@ -96,6 +139,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(
     {
+      type: "equipment" as const,
       id: scan.id,
       timestamp: scan.timestamp.toISOString(),
       notes: scan.notes,

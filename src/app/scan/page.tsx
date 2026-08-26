@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
-import type { CheckpointDTO, EquipmentDTO } from "@/lib/types";
+import type { CheckpointDTO, EquipmentDTO, PalletDTO } from "@/lib/types";
+import { PALLET_QR_PREFIX } from "@/lib/types";
 import QRScanner from "@/components/QRScanner";
 import StatusBadge from "@/components/StatusBadge";
 import { formatDateTime } from "@/lib/utils";
@@ -10,20 +11,18 @@ import { ROLE_LABELS } from "@/lib/permissions";
 
 interface ScanResult {
   id: string;
-  hostname: string;
+  label: string; // hostname, ou "Palete PAL-0001"
+  detail?: string; // ex: lista de hostnames da palete
   checkpointName: string;
   timestamp: string;
   ok: boolean;
   message?: string;
 }
 
-/** Leitura do QR Code à espera de confirmação antes de gravar o scan. */
-interface PendingScan {
-  hostname: string;
-  loading: boolean;
-  equipment: EquipmentDTO | null;
-  notFound: boolean;
-}
+/** Leitura do QR Code à espera de confirmação antes de gravar o(s) scan(s). */
+type PendingScan =
+  | { kind: "equipment"; hostname: string; loading: boolean; equipment: EquipmentDTO | null; notFound: boolean }
+  | { kind: "pallet"; code: string; loading: boolean; pallet: PalletDTO | null; notFound: boolean };
 
 const LS_CHECKPOINT = "movecontrol.scan.checkpointId";
 
@@ -76,23 +75,42 @@ export default function ScanPage() {
 
   const canScan = Boolean(checkpointId);
 
-  // 1) QR Code lido pela câmara → pára o scanner e procura o equipamento,
-  // para o utilizador confirmar antes de gravar seja o que for.
-  async function handleDetected(hostname: string) {
+  // 1) QR Code lido pela câmara → pára o scanner e procura o equipamento ou
+  // a palete (consoante o prefixo), para o utilizador confirmar antes de
+  // gravar seja o que for.
+  async function handleDetected(text: string) {
     if (pending) return; // já há uma leitura à espera de confirmação
     setScannerActive(false);
-    setPending({ hostname, loading: true, equipment: null, notFound: false });
 
+    if (text.startsWith(PALLET_QR_PREFIX)) {
+      const code = text.slice(PALLET_QR_PREFIX.length).trim();
+      setPending({ kind: "pallet", code, loading: true, pallet: null, notFound: false });
+      try {
+        const res = await fetch(`/api/pallets/${encodeURIComponent(code)}`);
+        if (res.status === 404) {
+          setPending({ kind: "pallet", code, loading: false, pallet: null, notFound: true });
+          return;
+        }
+        const pallet: PalletDTO = await res.json();
+        setPending({ kind: "pallet", code, loading: false, pallet, notFound: false });
+      } catch {
+        setPending({ kind: "pallet", code, loading: false, pallet: null, notFound: true });
+      }
+      return;
+    }
+
+    const hostname = text;
+    setPending({ kind: "equipment", hostname, loading: true, equipment: null, notFound: false });
     try {
       const res = await fetch(`/api/equipment/${encodeURIComponent(hostname)}`);
       if (res.status === 404) {
-        setPending({ hostname, loading: false, equipment: null, notFound: true });
+        setPending({ kind: "equipment", hostname, loading: false, equipment: null, notFound: true });
         return;
       }
       const equipment: EquipmentDTO = await res.json();
-      setPending({ hostname, loading: false, equipment, notFound: false });
+      setPending({ kind: "equipment", hostname, loading: false, equipment, notFound: false });
     } catch {
-      setPending({ hostname, loading: false, equipment: null, notFound: true });
+      setPending({ kind: "equipment", hostname, loading: false, equipment: null, notFound: true });
     }
   }
 
@@ -101,16 +119,20 @@ export default function ScanPage() {
     setScannerActive(true);
   }
 
-  // 2) Utilizador confirma → só agora é que o scan fica gravado.
+  // 2) Utilizador confirma → só agora é que o(s) scan(s) ficam gravados.
   async function confirmPending() {
     if (!pending || busy) return;
-    const { hostname } = pending;
     setBusy(true);
     try {
+      const body =
+        pending.kind === "pallet"
+          ? { palletCode: pending.code, checkpointId }
+          : { hostname: pending.hostname, checkpointId };
+
       const res = await fetch("/api/scans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hostname, checkpointId }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       const checkpointName = selectedCheckpoint?.name ?? "";
@@ -119,7 +141,7 @@ export default function ScanPage() {
         setResults((prev) => [
           {
             id: `${Date.now()}`,
-            hostname,
+            label: pending.kind === "pallet" ? `Palete ${pending.code}` : pending.hostname,
             checkpointName,
             timestamp: new Date().toISOString(),
             ok: false,
@@ -127,11 +149,24 @@ export default function ScanPage() {
           },
           ...prev,
         ]);
+      } else if (data.type === "pallet") {
+        setResults((prev) => [
+          {
+            id: `${data.pallet.id}-${data.timestamp}`,
+            label: `Palete ${data.pallet.code}${data.pallet.label ? ` — ${data.pallet.label}` : ""}`,
+            detail: `${data.equipment.length} equipamento(s): ${data.equipment.map((e: { hostname: string }) => e.hostname).join(", ")}`,
+            checkpointName: data.checkpoint.name,
+            timestamp: data.timestamp,
+            ok: true,
+          },
+          ...prev,
+        ]);
+        if (navigator.vibrate) navigator.vibrate(80);
       } else {
         setResults((prev) => [
           {
             id: data.id,
-            hostname: data.equipment.hostname,
+            label: data.equipment.hostname,
             checkpointName: data.checkpoint.name,
             timestamp: data.timestamp,
             ok: true,
@@ -152,7 +187,7 @@ export default function ScanPage() {
       <div>
         <h1 className="text-xl font-bold text-gray-900">Scan de Equipamento</h1>
         <p className="text-sm text-gray-500">
-          Seleciona o checkpoint atual e aponta a câmara ao QR Code do equipamento.
+          Seleciona o checkpoint atual e aponta a câmara ao QR Code do equipamento ou da palete.
         </p>
       </div>
 
@@ -233,11 +268,14 @@ export default function ScanPage() {
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold text-gray-900">{r.hostname}</p>
+                  <p className="font-semibold text-gray-900">{r.label}</p>
                   <time className="text-xs text-gray-400">{formatDateTime(r.timestamp)}</time>
                 </div>
                 {r.ok ? (
-                  <p className="text-xs text-gray-600">{r.checkpointName}</p>
+                  <>
+                    <p className="text-xs text-gray-600">{r.checkpointName}</p>
+                    {r.detail && <p className="mt-0.5 text-xs text-gray-500">{r.detail}</p>}
+                  </>
                 ) : (
                   <p className="text-xs text-red-700">{r.message}</p>
                 )}
@@ -264,7 +302,88 @@ function ConfirmScanCard({
   onConfirm: () => void;
 }) {
   if (pending.loading) {
-    return <p className="py-6 text-center text-sm text-gray-400">A procurar equipamento…</p>;
+    return (
+      <p className="py-6 text-center text-sm text-gray-400">
+        {pending.kind === "pallet" ? "A procurar palete…" : "A procurar equipamento…"}
+      </p>
+    );
+  }
+
+  if (pending.kind === "pallet") {
+    if (pending.notFound || !pending.pallet) {
+      return (
+        <div className="space-y-3 text-center">
+          <p className="text-sm font-semibold text-red-700">Palete &quot;{pending.code}&quot; não encontrada.</p>
+          <p className="text-xs text-gray-500">Confirma que o QR Code da palete está correto.</p>
+          <button
+            onClick={onCancel}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Voltar a Ler
+          </button>
+        </div>
+      );
+    }
+
+    const pallet = pending.pallet;
+
+    if (pallet.items.length === 0) {
+      return (
+        <div className="space-y-3 text-center">
+          <p className="text-sm font-semibold text-red-700">A palete &quot;{pallet.code}&quot; não tem equipamentos associados.</p>
+          <button
+            onClick={onCancel}
+            className="w-full rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Voltar a Ler
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        <div>
+          <p className="text-xs font-medium text-gray-500">Confirma a atualização de estado — Palete</p>
+          <p className="text-lg font-bold text-gray-900">
+            {pallet.code}
+            {pallet.label && <span className="ml-2 text-sm font-normal text-gray-500">{pallet.label}</span>}
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-gray-50 p-3 text-sm">
+          <p className="mb-2 text-xs text-gray-400">
+            {pallet.items.length} equipamento(s) nesta palete → novo checkpoint:{" "}
+            <span className="font-semibold text-brand-700">{checkpointName || "—"}</span>
+          </p>
+          <ul className="max-h-40 space-y-1 overflow-y-auto">
+            {pallet.items.map((item) => (
+              <li key={item.id} className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-medium text-gray-700">{item.hostname}</span>
+                <StatusBadge status={item.status} />
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={busy}
+            className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={busy}
+            className="flex-1 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            {busy ? "A gravar…" : `Confirmar Atualização (${pallet.items.length})`}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (pending.notFound || !pending.equipment) {

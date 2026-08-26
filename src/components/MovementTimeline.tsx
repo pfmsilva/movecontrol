@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ScanEventDTO } from "@/lib/types";
 import { formatDateTime } from "@/lib/utils";
 
@@ -26,7 +27,21 @@ export default function MovementTimeline({ scans }: { scans: ScanEventDTO[] }) {
             </p>
             <time className="text-xs text-gray-400">{formatDateTime(scan.timestamp)}</time>
           </div>
-          <p className="text-sm text-gray-500">Registado por {scan.user.name}</p>
+          <p className="text-sm text-gray-500">
+            Registado por {scan.user.name}
+            {scan.pallet && (
+              <>
+                {" "}
+                via palete{" "}
+                <Link
+                  href={`/pallets/${encodeURIComponent(scan.pallet.code)}`}
+                  className="font-medium text-brand-600 hover:underline"
+                >
+                  {scan.pallet.code}
+                </Link>
+              </>
+            )}
+          </p>
           {scan.notes && <p className="mt-1 text-sm text-gray-600">{scan.notes}</p>}
         </li>
       ))}

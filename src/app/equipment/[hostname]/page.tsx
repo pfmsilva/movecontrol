@@ -19,7 +19,7 @@ export default async function EquipmentDetailPage({ params }: Props) {
     prisma.equipment.findUnique({
       where: { hostname: decoded },
       include: {
-        scans: { include: { checkpoint: true, user: true }, orderBy: { timestamp: "desc" } },
+        scans: { include: { checkpoint: true, user: true, pallet: true }, orderBy: { timestamp: "desc" } },
         ports: true,
       },
     }),

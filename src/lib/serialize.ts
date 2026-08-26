@@ -7,11 +7,16 @@ import type {
   ScanUserDTO,
   UserDTO,
   PortConnectionDTO,
+  PalletRefDTO,
+  PalletDTO,
+  PalletSummaryDTO,
+  PalletEquipmentRefDTO,
+  EquipmentStatus,
 } from "@/lib/types";
 
 /** Include partilhado por todas as queries que depois passam por toEquipmentDTO. */
 export const EQUIPMENT_INCLUDE = {
-  scans: { include: { checkpoint: true, user: true } },
+  scans: { include: { checkpoint: true, user: true, pallet: true } },
   ports: true,
 } satisfies Prisma.EquipmentInclude;
 
@@ -51,6 +56,11 @@ function toScanUserDTO(u: { id: string; name: string; role: Role }): ScanUserDTO
   return { id: u.id, name: u.name, role: u.role };
 }
 
+function toPalletRefDTO(p: { id: string; code: string; label: string | null } | null): PalletRefDTO | null {
+  if (!p) return null;
+  return { id: p.id, code: p.code, label: p.label };
+}
+
 export type UserWithCheckpoints = Prisma.UserGetPayload<{ include: { validatorCheckpoints: true } }>;
 
 /** Converte um User (sem nunca expor o passwordHash) num UserDTO. */
@@ -77,6 +87,7 @@ function toScanDTO(
     timestamp: s.timestamp.toISOString(),
     checkpoint: toCheckpointDTO(s.checkpoint),
     user: toScanUserDTO(s.user),
+    pallet: toPalletRefDTO(s.pallet),
   };
 }
 
@@ -130,5 +141,62 @@ export function toEquipmentDTO(
     destinationPosition: equipment.destinationPosition,
     ports: [...equipment.ports].sort((a, b) => a.order - b.order).map(toPortConnectionDTO),
     ...(opts.includeHistory ? { scans: sortedScans.map(toScanDTO) } : {}),
+  };
+}
+
+// — Paletes —
+
+export const PALLET_ITEM_INCLUDE = {
+  items: {
+    include: {
+      equipment: {
+        include: { scans: { include: { checkpoint: true }, orderBy: { timestamp: "desc" }, take: 1 } },
+      },
+    },
+  },
+} satisfies Prisma.PalletInclude;
+
+export type PalletWithItems = Prisma.PalletGetPayload<{ include: typeof PALLET_ITEM_INCLUDE }>;
+
+/** Converte uma Palete (com items + equipamentos incluídos) num PalletDTO. */
+export function toPalletDTO(pallet: PalletWithItems, maxCheckpointOrder: number | null): PalletDTO {
+  const items: PalletEquipmentRefDTO[] = pallet.items.map(({ equipment }) => {
+    const lastScan = equipment.scans[0] ?? null;
+    const status: EquipmentStatus = deriveStatus(lastScan?.checkpoint.order ?? null, maxCheckpointOrder);
+    return {
+      id: equipment.id,
+      hostname: equipment.hostname,
+      model: equipment.model,
+      status,
+      currentCheckpoint: lastScan ? toCheckpointDTO(lastScan.checkpoint) : null,
+    };
+  });
+
+  return {
+    id: pallet.id,
+    code: pallet.code,
+    label: pallet.label,
+    notes: pallet.notes,
+    createdAt: pallet.createdAt.toISOString(),
+    items,
+  };
+}
+
+export const PALLET_SUMMARY_INCLUDE = {
+  items: { include: { equipment: { select: { hostname: true } } } },
+} satisfies Prisma.PalletInclude;
+
+export type PalletWithHostnames = Prisma.PalletGetPayload<{ include: typeof PALLET_SUMMARY_INCLUDE }>;
+
+/** Versão reduzida (para listagens) — sem precisar de calcular o estado de cada equipamento. */
+export function toPalletSummaryDTO(pallet: PalletWithHostnames): PalletSummaryDTO {
+  return {
+    id: pallet.id,
+    code: pallet.code,
+    label: pallet.label,
+    notes: pallet.notes,
+    createdAt: pallet.createdAt.toISOString(),
+    itemCount: pallet.items.length,
+    hostnames: pallet.items.map((i) => i.equipment.hostname),
   };
 }

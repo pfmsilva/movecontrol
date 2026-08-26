@@ -15,6 +15,11 @@ export function canManageCheckpoints(role: Role | undefined): boolean {
   return role === "ADMIN" || role === "CONTROLLER";
 }
 
+/** ADMIN e CONTROLLER podem criar/editar/apagar paletes. */
+export function canManagePallets(role: Role | undefined): boolean {
+  return role === "ADMIN" || role === "CONTROLLER";
+}
+
 /** VALIDATOR só pode assumir os checkpoints que lhe estão associados. */
 export function isRestrictedValidator(role: Role | undefined): boolean {
   return role === "VALIDATOR";

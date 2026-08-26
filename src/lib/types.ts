@@ -28,6 +28,13 @@ export interface ScanUserDTO {
   role: Role;
 }
 
+/** Referência reduzida a uma Palete, usada quando embutida noutro objeto. */
+export interface PalletRefDTO {
+  id: string;
+  code: string;
+  label: string | null;
+}
+
 export interface ScanEventDTO {
   id: string;
   equipmentId: string;
@@ -37,6 +44,39 @@ export interface ScanEventDTO {
   timestamp: string;
   checkpoint: CheckpointDTO;
   user: ScanUserDTO;
+  /** Não nulo quando este scan resultou de um scan de Palete. */
+  pallet: PalletRefDTO | null;
+}
+
+/** Prefixo usado no conteúdo do QR Code de uma Palete, para o distinguir do
+ * QR (só o hostname) de um Equipamento ao fazer scan. */
+export const PALLET_QR_PREFIX = "PALETE:";
+
+export interface PalletEquipmentRefDTO {
+  id: string;
+  hostname: string;
+  model: string | null;
+  status: EquipmentStatus;
+  currentCheckpoint: CheckpointDTO | null;
+}
+
+export interface PalletDTO {
+  id: string;
+  code: string;
+  label: string | null;
+  notes: string | null;
+  createdAt: string;
+  items: PalletEquipmentRefDTO[];
+}
+
+export interface PalletSummaryDTO {
+  id: string;
+  code: string;
+  label: string | null;
+  notes: string | null;
+  createdAt: string;
+  itemCount: number;
+  hostnames: string[];
 }
 
 export interface PortConnectionDTO {

@@ -64,6 +64,24 @@ inteira com todos estes campos e o QR Code do equipamento no cabeçalho — para
 acompanhar fisicamente a mudança. (O bloco de assinaturas/validação do formulário original não
 está incluído, por ser preenchido à mão no local.)
 
+## Paletes
+
+Numa migração física, vários equipamentos são muitas vezes movidos juntos numa palete. Em
+**Paletes** (ADMIN/CONTROLLER criam e geram equipamentos; qualquer role visualiza):
+
+- Cada palete tem um **código único** (gerado automaticamente, ex: `PAL-0001`) e a sua própria
+  ficha/QR — independente do QR de cada equipamento.
+- No detalhe da palete, adicionam-se/removem-se equipamentos pelo hostname; a **Vista de
+  Impressão** gera uma "Ficha de Palete" A4 com o QR e a lista de equipamentos lá dentro.
+- No **Scan**, ler o QR de uma palete (em vez do QR de um equipamento) mostra a lista de todos
+  os equipamentos que contém e, ao confirmar, regista o mesmo checkpoint para todos de uma só
+  vez — uma única leitura em vez de uma por equipamento.
+- Cada scan resultante fica marcado como "via palete PAL-XXXX" na timeline do equipamento, para
+  rastreabilidade completa mesmo tendo sido feito em lote.
+
+Tecnicamente, o QR de uma palete codifica `PALETE:<código>` (o de um equipamento continua a ser
+só o hostname) — é assim que o scan distingue os dois tipos de leitura.
+
 ## Estrutura do projeto
 
 ```
