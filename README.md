@@ -71,13 +71,19 @@ Numa migração física, vários equipamentos são muitas vezes movidos juntos n
 
 - Cada palete tem um **código único** (gerado automaticamente, ex: `PAL-0001`) e a sua própria
   ficha/QR — independente do QR de cada equipamento.
-- No detalhe da palete, adicionam-se/removem-se equipamentos pelo hostname; a **Vista de
-  Impressão** gera uma "Ficha de Palete" A4 com o QR e a lista de equipamentos lá dentro.
+- No detalhe da palete, adicionam-se/removem-se equipamentos **apontando a câmara ao QR de cada
+  equipamento** (modo "Adicionar" ou "Remover", scan a seguir a scan, sem passo de confirmação —
+  pensado para carregar/descarregar a palete rapidamente); um campo de hostname manual fica
+  disponível como alternativa. A **Vista de Impressão** gera uma "Ficha de Palete" A4 com o QR e
+  a lista de equipamentos lá dentro.
 - No **Scan**, ler o QR de uma palete (em vez do QR de um equipamento) mostra a lista de todos
   os equipamentos que contém e, ao confirmar, regista o mesmo checkpoint para todos de uma só
   vez — uma única leitura em vez de uma por equipamento.
 - Cada scan resultante fica marcado como "via palete PAL-XXXX" na timeline do equipamento, para
   rastreabilidade completa mesmo tendo sido feito em lote.
+- Um equipamento **acompanha o estado da palete** enquanto lá estiver dentro: só é incluído num
+  scan de palete enquanto for membro no momento da leitura — se for removido antes de um scan
+  posterior, deixa de receber essa atualização e passa a seguir o seu próprio histórico.
 
 Tecnicamente, o QR de uma palete codifica `PALETE:<código>` (o de um equipamento continua a ser
 só o hostname) — é assim que o scan distingue os dois tipos de leitura.
