@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toEquipmentDTO, EQUIPMENT_INCLUDE } from "@/lib/serialize";
 import { auth } from "@/auth";
-import { canManageEquipment } from "@/lib/permissions";
+import { canManageEquipment, canArchiveEquipment } from "@/lib/permissions";
 import type { PortType } from "@prisma/client";
 
 interface Params {
@@ -137,6 +137,14 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const { hostname } = await params;
   const decoded = decodeURIComponent(hostname);
+
+  // Equipamento arquivado só pode ser eliminado definitivamente por um ADMIN,
+  // a partir do separador de Arquivo.
+  const existing = await prisma.equipment.findUnique({ where: { hostname: decoded }, select: { archived: true } });
+  if (existing?.archived && !canArchiveEquipment(session.user.role)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+  }
+
   try {
     await prisma.equipment.delete({ where: { hostname: decoded } });
     return NextResponse.json({ ok: true });

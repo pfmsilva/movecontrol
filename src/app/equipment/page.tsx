@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import type { EquipmentDTO } from "@/lib/types";
 import StatusBadge from "@/components/StatusBadge";
-import { canManageEquipment } from "@/lib/permissions";
+import { canManageEquipment, canArchiveEquipment } from "@/lib/permissions";
 
 interface ImportRowError {
   rowNumber: number;
@@ -21,6 +21,7 @@ interface ImportResult {
 export default function EquipmentPage() {
   const { data: session } = useSession();
   const canManage = canManageEquipment(session?.user.role);
+  const canArchive = canArchiveEquipment(session?.user.role);
   const [equipment, setEquipment] = useState<EquipmentDTO[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
@@ -69,6 +70,16 @@ export default function EquipmentPage() {
     load();
   }
 
+  async function handleArchive(hostname: string) {
+    if (!confirm(`Arquivar o equipamento "${hostname}"? Deixa de aparecer nesta listagem.`)) return;
+    await fetch(`/api/equipment/${encodeURIComponent(hostname)}/archive`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ archived: true }),
+    });
+    load();
+  }
+
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -108,6 +119,14 @@ export default function EquipmentPage() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {canArchive && (
+            <Link
+              href="/equipment/archived"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Arquivo
+            </Link>
+          )}
           {/* Downloads de ficheiro (rotas de API, não páginas) — <a> normal é o correto aqui. */}
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
           <a
@@ -267,6 +286,11 @@ export default function EquipmentPage() {
                       <Link href={`/equipment/${encodeURIComponent(eq.hostname)}/print`} className="text-brand-600 hover:underline">
                         Imprimir QR
                       </Link>
+                      {canArchive && (
+                        <button onClick={() => handleArchive(eq.hostname)} className="text-gray-500 hover:underline">
+                          Arquivar
+                        </button>
+                      )}
                       {canManage && (
                         <button onClick={() => handleDelete(eq.hostname)} className="text-red-600 hover:underline">
                           Eliminar

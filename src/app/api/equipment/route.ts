@@ -2,16 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { toEquipmentDTO, EQUIPMENT_INCLUDE } from "@/lib/serialize";
 import { auth } from "@/auth";
-import { canManageEquipment } from "@/lib/permissions";
+import { canManageEquipment, canArchiveEquipment } from "@/lib/permissions";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
 
+  // ?archived=true devolve o separador de Arquivo — só ADMIN tem acesso.
+  const wantArchived = req.nextUrl.searchParams.get("archived") === "true";
+  if (wantArchived && !canArchiveEquipment(session.user.role)) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
+  }
+
   const [equipment, maxOrderCp] = await Promise.all([
     prisma.equipment.findMany({
+      where: { archived: wantArchived },
       include: EQUIPMENT_INCLUDE,
       orderBy: { hostname: "asc" },
     }),

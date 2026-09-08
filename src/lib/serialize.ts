@@ -142,6 +142,8 @@ export function toEquipmentDTO(
     destinationRack: equipment.destinationRack,
     destinationPosition: equipment.destinationPosition,
     ports: [...equipment.ports].sort((a, b) => a.order - b.order).map(toPortConnectionDTO),
+    archived: equipment.archived,
+    archivedAt: equipment.archivedAt ? equipment.archivedAt.toISOString() : null,
     ...(opts.includeHistory ? { scans: sortedScans.map(toScanDTO) } : {}),
   };
 }

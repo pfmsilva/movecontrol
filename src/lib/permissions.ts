@@ -10,6 +10,11 @@ export function canManageEquipment(role: Role | undefined): boolean {
   return role === "ADMIN" || role === "CONTROLLER";
 }
 
+/** Só ADMIN pode arquivar/desarquivar equipamentos e aceder ao separador de Arquivo. */
+export function canArchiveEquipment(role: Role | undefined): boolean {
+  return role === "ADMIN";
+}
+
 /** ADMIN e CONTROLLER podem criar/editar/apagar checkpoints. */
 export function canManageCheckpoints(role: Role | undefined): boolean {
   return role === "ADMIN" || role === "CONTROLLER";

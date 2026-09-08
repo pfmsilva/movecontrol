@@ -166,6 +166,8 @@ export interface EquipmentDTO extends EquipmentFormFields {
   lastScan: ScanEventDTO | null;
   scans?: ScanEventDTO[];
   ports: PortConnectionDTO[];
+  archived: boolean;
+  archivedAt: string | null;
 }
 
 export interface StatsDTO {
