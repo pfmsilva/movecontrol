@@ -11,6 +11,7 @@ export async function GET() {
 
   const [equipment, checkpoints] = await Promise.all([
     prisma.equipment.findMany({
+      where: { archived: false },
       include: {
         scans: {
           include: { checkpoint: true },

@@ -2,8 +2,9 @@
 
 import { Fragment, useState } from "react";
 import Link from "next/link";
-import type { EquipmentDTO } from "@/lib/types";
+import type { EquipmentDTO, ScanEventDTO } from "@/lib/types";
 import StatusBadge from "@/components/StatusBadge";
+import MovementTimeline from "@/components/MovementTimeline";
 import { formatRelative } from "@/lib/utils";
 
 interface Props {
@@ -17,6 +18,22 @@ interface Props {
 
 export default function EquipmentTable({ equipment, selectable, selected, onToggle, onToggleAll }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [history, setHistory] = useState<Record<string, ScanEventDTO[]>>({});
+  const [loadingHostname, setLoadingHostname] = useState<string | null>(null);
+
+  async function toggleExpand(eq: EquipmentDTO) {
+    const willOpen = expanded !== eq.id;
+    setExpanded(willOpen ? eq.id : null);
+    if (willOpen && eq.lastScan && !history[eq.hostname]) {
+      setLoadingHostname(eq.hostname);
+      const res = await fetch(`/api/equipment/${encodeURIComponent(eq.hostname)}`, { cache: "no-store" });
+      if (res.ok) {
+        const dto: EquipmentDTO = await res.json();
+        setHistory((prev) => ({ ...prev, [eq.hostname]: dto.scans ?? [] }));
+      }
+      setLoadingHostname(null);
+    }
+  }
 
   if (equipment.length === 0) {
     return (
@@ -67,10 +84,7 @@ export default function EquipmentTable({ equipment, selectable, selected, onTogg
                   </td>
                 )}
                 <td className="px-4 py-3">
-                  <button
-                    onClick={() => setExpanded(expanded === eq.id ? null : eq.id)}
-                    className="font-semibold text-gray-900 hover:text-brand-700"
-                  >
+                  <button onClick={() => toggleExpand(eq)} className="font-semibold text-gray-900 hover:text-brand-700">
                     {eq.hostname}
                   </button>
                   {eq.model && <p className="text-xs text-gray-400">{eq.model}</p>}
@@ -87,10 +101,7 @@ export default function EquipmentTable({ equipment, selectable, selected, onTogg
                 <td className="px-4 py-3 text-gray-500">{eq.lastScan?.user.name ?? "—"}</td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-3 whitespace-nowrap text-xs font-medium">
-                    <button
-                      onClick={() => setExpanded(expanded === eq.id ? null : eq.id)}
-                      className="text-brand-600 hover:underline"
-                    >
+                    <button onClick={() => toggleExpand(eq)} className="text-brand-600 hover:underline">
                       {expanded === eq.id ? "Ocultar" : "Histórico"}
                     </button>
                     <Link href={`/equipment/${encodeURIComponent(eq.hostname)}`} className="text-brand-600 hover:underline">
@@ -110,8 +121,10 @@ export default function EquipmentTable({ equipment, selectable, selected, onTogg
                   <td colSpan={selectable ? 7 : 6} className="px-4 py-3">
                     {eq.lastScan == null ? (
                       <p className="text-xs text-gray-400">Ainda não existem registos de scan para este equipamento.</p>
+                    ) : loadingHostname === eq.hostname ? (
+                      <p className="text-xs text-gray-400">A carregar histórico…</p>
                     ) : (
-                      <MiniTimelineHint hostname={eq.hostname} />
+                      <MovementTimeline scans={history[eq.hostname] ?? []} />
                     )}
                   </td>
                 </tr>
@@ -121,17 +134,5 @@ export default function EquipmentTable({ equipment, selectable, selected, onTogg
         </tbody>
       </table>
     </div>
-  );
-}
-
-function MiniTimelineHint({ hostname }: { hostname: string }) {
-  return (
-    <p className="text-xs text-gray-500">
-      Consulta a timeline completa de movimentação em{" "}
-      <Link href={`/equipment/${encodeURIComponent(hostname)}`} className="font-medium text-brand-600 hover:underline">
-        detalhe do equipamento
-      </Link>
-      .
-    </p>
   );
 }

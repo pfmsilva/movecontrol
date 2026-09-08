@@ -60,7 +60,14 @@ model Equipment {
   palletItems  PalletItem[]
   palletEvents PalletEvent[]
 
+  /// Equipamento arquivado — deixa de aparecer na listagem principal e passa
+  /// para o separador de Arquivo, visível apenas para ADMIN. Só a partir daí
+  /// pode ser eliminado definitivamente da aplicação.
+  archived   Boolean   @default(false)
+  archivedAt DateTime?
+
   @@index([hostname])
+  @@index([archived])
 }
 
 /// Palete física que pode agrupar vários equipamentos para serem movidos em
